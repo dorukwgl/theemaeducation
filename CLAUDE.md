@@ -25,8 +25,8 @@ EMA Education Platform is a comprehensive web-based educational management syste
 
 ### 🔄 Phase 2: Core Systems (Week 2) - IN PROGRESS
 - 2.1 Authentication System - ✅ **COMPLETED**
-- 2.2 User Management
-- 2.3 Access Control System
+- 2.2 User Management - ✅ **COMPLETED**
+- 2.3 Access Control System - ✅ **COMPLETED**
 - 2.4 File Management
 
 #### ✅ Phase 2.1: Authentication System (April 20, 2026)
@@ -67,6 +67,108 @@ Complete session-based authentication implementation:
 - `POST /api/auth/reset-password` - Complete password reset (15 attempts/hour)
 - `POST /api/auth/change-password` - Change password (authenticated)
 - `GET /api/auth/me` - Get current user info
+
+#### ✅ Phase 2.2: User Management (April 20, 2026)
+Complete user management system implementation:
+
+**Models Extended:**
+- `src/models/User.php` - Extended with user management methods:
+  - `getAllUsers()` - User listing with pagination, search, role filtering, sorting
+  - `deleteUserCascade()` - User deletion with cascade cleanup
+  - `getAllAdmins()` - Admin user listing
+  - `grantAdmin()` - Grant admin privileges
+  - `revokeAdmin()` - Revoke admin privileges
+  - `isAdmin()` - Check admin status
+  - `getUserStats()` - User statistics for dashboard
+
+**Controllers Created:**
+- `src/controllers/UserController.php` - User management endpoints:
+  - `index()` - List users with pagination (admin only)
+  - `show()` - Get user profile (admin or own)
+  - `update()` - Update user profile (admin or own)
+  - `delete()` - Delete user with cascade (admin only)
+
+- `src/controllers/AdminController.php` - Admin operations:
+  - `index()` - List admin users (admin only)
+  - `grant()` - Grant admin privileges (admin only)
+  - `list()` - Alternative admin listing (admin only)
+  - `approveReset()` - Approve password reset requests (admin only)
+
+**Features Implemented:**
+- User listing with pagination and search
+- Profile management with role-based permissions
+- Admin privilege management
+- Cascade deletion for user accounts
+- Password reset approval workflow
+- Comprehensive security logging
+
+**API Endpoints:**
+- `GET /api/users` - List users (admin only)
+- `GET /api/users/{id}` - Get user profile
+- `PUT /api/users/{id}` - Update user profile
+- `DELETE /api/users/{id}` - Delete user account
+- `GET /api/admins` - List admin users
+- `POST /api/admin/grant` - Grant admin privileges
+- `GET /api/admin/list` - List all admin users
+- `POST /api/admin/approve-reset` - Approve password reset
+
+#### ✅ Phase 2.3: Access Control System (April 20, 2026)
+Complete access control system implementation:
+
+**Models Created:**
+- `src/models/Access.php` - Access control database operations:
+  - `checkAccess()` - Check if user has access to item
+  - `grantAccess()` - Grant user access to item
+  - `revokeAccess()` - Revoke user access from item
+  - `incrementAccess()` - Increment access count with limit enforcement
+  - `getPermissions()` - Get user permissions with filters
+  - `grantAccessToAllUsers()` - Grant/revoke public access
+  - `grantAccessToLoggedInUsers()` - Grant/revoke logged-in access
+  - `getAllUsersAccess()` - List public access items
+  - `getLoggedInUsersAccess()` - List logged-in access items
+  - `getAccessStats()` - Get access statistics
+
+**Services Created:**
+- `src/services/AccessService.php` - Access control business logic:
+  - `validateAccessRequest()` - Validate access requests
+  - `checkAccess()` - Check access with caching layer
+  - `grantAccessWithValidation()` - Grant access with validation
+  - `revokeAccessWithValidation()` - Revoke access with validation
+  - `incrementAccessWithCheck()` - Increment access with limit check
+  - `bulkGrantAccess()` - Bulk grant access to multiple users
+  - `getAccessReport()` - Generate detailed access reports
+  - `cleanupExpiredAccess()` - Cleanup expired/inactive permissions
+
+**Controllers Created:**
+- `src/controllers/AccessController.php` - Access control endpoints:
+  - `check()` - Check access permissions (authenticated users)
+  - `increment()` - Increment access count (authenticated users)
+  - `grant()` - Grant/revoke user access (admin only)
+  - `permissions()` - List permissions (admin only)
+  - `grantAllUsers()` - Grant/revoke public access (admin only)
+  - `allUsers()` - List public access items (admin only)
+  - `grantLoginUsers()` - Grant/revoke logged-in access (admin only)
+  - `loginUsers()` - List logged-in access items (admin only)
+
+**Features Implemented:**
+- User access checking (admin bypass, public access, individual permissions)
+- Access counting and limit enforcement
+- Public access management (all users)
+- Logged-in access management (authenticated users)
+- Bulk access operations
+- Access statistics and reporting
+- Comprehensive security logging
+- Admin-only access control enforcement
+
+**API Endpoints:**
+- `POST /api/access/check` - Check access permissions
+- `POST /api/access/increment` - Increment access count
+- `POST /api/access/grant` - Grant/revoke user access
+- `GET /api/access/permissions` - List permissions
+- `POST /api/access/all-users` - Grant/revoke public access
+- `GET /api/access/all-users` - List public access items
+- `POST /api/access/login-users` - Grant/revoke logged-in access
+- `GET /api/access/login-users` - List logged-in access items
 
 ### 📋 Phase 3: Content Management (Week 3)
 - 3.1 Folder System
@@ -126,17 +228,19 @@ src/
 │   └── ValidationMiddleware.php # Input validation (✅)
 ├── controllers/    # Application controllers
 │   ├── AuthController.php   # Authentication endpoints (✅)
-│   ├── UserController.php   # User management (to be implemented)
+│   ├── UserController.php   # User management (✅)
+│   ├── AdminController.php  # Admin operations (✅)
+│   ├── AccessController.php # Access control (✅)
 │   ├── FolderController.php # Folder management (to be implemented)
 │   ├── FileController.php   # File management (to be implemented)
 │   ├── QuizController.php   # Quiz management (to be implemented)
-│   ├── AdminController.php  # Admin operations (to be implemented)
-│   ├── AccessController.php # Access control (to be implemented)
 │   └── SystemController.php # System operations (to be implemented)
 ├── models/        # Data models
-│   └── User.php          # User model (✅)
+│   ├── User.php          # User model (✅)
+│   └── Access.php        # Access model (✅)
 ├── services/      # Business logic services
-│   └── AuthService.php   # Authentication logic (✅)
+│   ├── AuthService.php   # Authentication logic (✅)
+│   └── AccessService.php # Access control logic (✅)
 └── utils/         # Utility classes
     ├── Logger.php      # Logging system (✅)
     ├── Security.php    # Security utilities (✅)
@@ -180,7 +284,7 @@ composer migrate          # Run database migrations
 ## Key Architectural Decisions
 
 ### PSR-4 Autoloading
-All classes follow PSR-4 autoloading with namespace `EMA\`. Classes are autoloaded from the `src/` directory. Example: `EMA\Config\Config` maps to `src/config/Config.php`.
+All classes follow PSR-4 autoloading with namespace `EMA\`. Classes are autoloaded from `src/` directory. Example: `EMA\Config\Config` maps to `src/config/Config.php`.
 
 ### Request/Response Pattern
 The framework uses a centralized Request and Response pattern. Controllers receive Request objects and should use Response methods for consistent API responses. All API responses use JSON format with `success`, `message`, and optional `data` or `errors` fields.
@@ -201,6 +305,7 @@ The platform implements a complex access control system with:
 - **Item types**: `file`, `quiz_set`
 - **Granular permissions**: Individual user access, role-based access, admin overrides
 - **Access tracking**: Limits on how many times content can be accessed
+- **Permission types**: User-specific, public access, logged-in access
 
 ### Quiz System Architecture
 The quiz system supports:
@@ -242,15 +347,15 @@ The quiz system supports:
 {
   "success": true|false,
   "message": "Human-readable message",
-  "data": {}, // Optional, for successful responses
-  "errors": [] // Optional, for error responses
+  "data": {}, // optional, for successful responses
+  "errors": [] // optional, for error responses
 }
 ```
 
 ### Error Handling
-- Use appropriate HTTP status codes (401, 403, 404, 422, 500)
+- Use appropriate HTTP status codes (200, 201, 400, 401, 403, 404, 422, 500)
 - Provide clear error messages via Response methods
-- Log errors for debugging using the logging system
+- Log errors for debugging using logging system
 
 ## Security Considerations
 
@@ -356,7 +461,7 @@ AuthMiddleware::requireAdmin();
 
 ## Authentication System
 
-Phase 2.1 implements a complete session-based authentication system with the following components:
+Phase 2.1 implements a complete session-based authentication system with following components:
 
 **User Model (`src/models/User.php`):**
 ```php
@@ -467,16 +572,191 @@ All authentication endpoints are handled automatically by the router. The contro
 - Brute force protection via IP lockout
 - Comprehensive security logging
 
+## User Management System
+
+Phase 2.2 implements a complete user management system with following components:
+
+**User Model Extensions (`src/models/User.php`):**
+```php
+use EMA\Models\User;
+
+// Get all users with pagination
+$users = User::getAllUsers($page = 1, $perPage = 20, $search = null, $role = null, $sortBy = 'created_at', $sortOrder = 'DESC');
+
+// Delete user with cascade cleanup
+$result = User::deleteUserCascade($userId);
+
+// Get all admin users
+$admins = User::getAllAdmins();
+
+// Grant admin privileges
+$result = User::grantAdmin($userId, 'admin@example.com');
+
+// Revoke admin privileges
+$result = User::revokeAdmin($userId);
+
+// Check if user is admin
+$isAdmin = User::isAdmin($userId);
+
+// Get user statistics
+$stats = User::getUserStats();
+```
+
+**UserController (`src/controllers/UserController.php`):**
+```php
+// List users (admin only)
+GET /api/users?page=1&per_page=20&search=john&role=user&sort_by=created_at&sort_order=DESC
+
+// Get user profile
+GET /api/users/{id}
+
+// Update user profile
+PUT /api/users/{id}
+Body: { full_name, phone, image } (user) or { full_name, email, phone, image, role } (admin)
+
+// Delete user (admin only)
+DELETE /api/users/{id}
+```
+
+**AdminController (`src/controllers/AdminController.php`):**
+```php
+// List admin users (admin only)
+GET /api/admins
+
+// Grant admin privileges (admin only)
+POST /api/admin/grant
+Body: { user_id, email (optional) }
+
+// List admin users (alternative format) (admin only)
+GET /api/admin/list
+
+// Approve password reset (admin only)
+POST /api/admin/approve-reset
+Body: { reset_id, action: 'approve'|'reject' }
+```
+
+## Access Control System
+
+Phase 2.3 implements a complete access control system with following components:
+
+**Access Model (`src/models/Access.php`):**
+```php
+use EMA\Models\Access;
+
+// Check if user has access
+$hasAccess = Access::checkAccess($userId, $itemId, $itemType);
+
+// Grant user access
+$result = Access::grantAccess($userId, $itemId, $itemType, $accessTimes = 0);
+
+// Revoke user access
+$result = Access::revokeAccess($userId, $itemId, $itemType);
+
+// Increment access count
+$result = Access::incrementAccess($userId, $itemId, $itemType);
+
+// Get user permissions
+$permissions = Access::getPermissions($userId, $itemType);
+
+// Grant public access
+$result = Access::grantAccessToAllUsers($itemId, $itemType, $grant = true);
+
+// Grant logged-in access
+$result = Access::grantAccessToLoggedInUsers($itemId, $itemType, $grant = true);
+
+// Get public access items
+$items = Access::getAllUsersAccess($itemType);
+
+// Get logged-in access items
+$items = Access::getLoggedInUsersAccess($itemType);
+
+// Get access statistics
+$stats = Access::getAccessStats($itemId, $itemType);
+```
+
+**AccessService (`src/services/AccessService.php`):**
+```php
+use EMA\Services\AccessService;
+
+$accessService = new AccessService();
+
+// Validate access request
+$validation = $accessService->validateAccessRequest($data);
+
+// Check access with caching
+$hasAccess = $accessService->checkAccess($userId, $itemId, $itemType);
+
+// Grant access with validation
+$result = $accessService->grantAccessWithValidation($data);
+
+// Revoke access with validation
+$result = $accessService->revokeAccessWithValidation($userId, $itemId, $itemType);
+
+// Increment access with limit check
+$result = $accessService->incrementAccessWithCheck($userId, $itemId, $itemType);
+
+// Bulk grant access
+$result = $accessService->bulkGrantAccess($userIds, $itemId, $itemType, $accessTimes = 0);
+
+// Get access report
+$report = $accessService->getAccessReport($itemId, $itemType);
+
+// Cleanup expired access
+$result = $accessService->cleanupExpiredAccess();
+```
+
+**AccessController (`src/controllers/AccessController.php`):**
+```php
+// Check access permissions (authenticated users)
+POST /api/access/check
+Body: { item_id, item_type: 'file'|'quiz_set' }
+
+// Increment access count (authenticated users)
+POST /api/access/increment
+Body: { item_id, item_type: 'file'|'quiz_set' }
+
+// Grant/revoke user access (admin only)
+POST /api/access/grant
+Body: { user_id, item_id, item_type, access_times, action: 'grant'|'revoke' }
+
+// List permissions (admin only)
+GET /api/access/permissions?user_id=123&item_type=file
+
+// Grant/revoke public access (admin only)
+POST /api/access/all-users
+Body: { item_id, item_type: 'file'|'quiz_set', grant: true|false }
+
+// List public access items (admin only)
+GET /api/access/all-users?item_type=file
+
+// Grant/revoke logged-in access (admin only)
+POST /api/access/login-users
+Body: { item_id, item_type: 'file'|'quiz_set', grant: true|false }
+
+// List logged-in access items (admin only)
+GET /api/access/login-users?item_type=file
+```
+
+**Access Control Features:**
+- User access checking (admin bypass, public access, individual permissions)
+- Access counting and limit enforcement
+- Public access management (all users)
+- Logged-in access management (authenticated users)
+- Bulk access operations
+- Access statistics and reporting
+- Admin-only access control enforcement
+- Comprehensive security logging
+
 ## Legacy Code Migration
 
-The project is transitioning from legacy PHP files (currently deleted in git) to the new architecture. Legacy API endpoints should be gradually migrated to:
+The project is transitioning from legacy PHP files (currently deleted in git) to a new architecture. Legacy API endpoints should be gradually migrated to:
 1. Controllers in `src/controllers/`
 2. Models in `src/models/`
 3. Services in `src/services/` for business logic
 4. Middleware in `src/middleware/` for cross-cutting concerns
 
-When implementing new features, use the new architecture rather than the legacy patterns.
+When implementing new features, use the new architecture rather than legacy patterns.
 
 ## Testing
 
-PHPUnit is configured for testing. Test files should be placed in the `tests/` directory following PSR-4 autoloading with namespace `EMA\Tests\`. The project includes database fixtures in the SQL file for testing purposes.
+PHPUnit is configured for testing. Test files should be placed in `tests/` directory following PSR-4 autoloading with namespace `EMA\Tests\`. The project includes database fixtures in SQL file for testing purposes.
