@@ -27,7 +27,7 @@ EMA Education Platform is a comprehensive web-based educational management syste
 - 2.1 Authentication System - ✅ **COMPLETED**
 - 2.2 User Management - ✅ **COMPLETED**
 - 2.3 Access Control System - ✅ **COMPLETED**
-- 2.4 File Management
+- 2.4 File Management - ✅ **COMPLETED**
 
 #### ✅ Phase 2.1: Authentication System (April 20, 2026)
 Complete session-based authentication implementation:
@@ -170,6 +170,87 @@ Complete access control system implementation:
 - `POST /api/access/login-users` - Grant/revoke logged-in access
 - `GET /api/access/login-users` - List logged-in access items
 
+#### ✅ Phase 2.4: File Management System (April 20, 2026)
+Complete file and folder management system implementation:
+
+**Models Created:**
+- `src/models/Folder.php` - Folder model with CRUD operations:
+  - `getAllFolders()` - List all folders with file counts
+  - `findById()` - Find folder by ID
+  - `create()` - Create new folder with icon upload
+  - `update()` - Update folder with icon replacement
+  - `delete()` - Delete folder with cascade cleanup
+  - `getFolderContents()` - Get files in folder
+
+- `src/models/File.php` - File model with access control integration:
+  - `findById()` - Find file by ID with folder details
+  - `create()` - Create file record
+  - `update()` - Update file metadata
+  - `delete()` - Delete file with cascade cleanup
+  - `checkFileAccess()` - Check file access with Access model integration
+  - `getFileStats()` - Get file access statistics
+  - `getFilesByFolder()` - Get files by folder with user filtering
+
+**Controllers Created:**
+- `src/controllers/FolderController.php` - Folder management endpoints:
+  - `index()` - List all folders (authenticated users)
+  - `store()` - Create new folder (admin only)
+  - `show()` - Get folder details (authenticated users)
+  - `update()` - Update folder (admin only)
+  - `delete()` - Delete folder (admin only)
+  - `contents()` - Get folder contents (authenticated users)
+
+- `src/controllers/FileController.php` - File management endpoints:
+  - `upload()` - Upload file with security validation (admin only)
+  - `show()` - Get file details with access info (authenticated users)
+  - `delete()` - Delete file (admin only)
+  - `download()` - Download file with access tracking (authenticated users)
+
+**Features Implemented:**
+- Folder CRUD operations with icon management
+- File upload with comprehensive security (MIME type, size, extension validation)
+- File download with access control and tracking
+- Secure filename generation and file storage
+- Cascade deletion (files, icons, access permissions)
+- Access control integration for all file operations
+- Public and logged-in access types support
+- Individual user permissions via Access model
+- Admin bypass for all operations
+- CSRF protection on all state-changing operations
+- Comprehensive security logging
+- File path validation (directory traversal prevention)
+- Proper HTTP headers for downloads
+
+**File Upload Security:**
+- Multi-layer validation (MIME type, extension, size)
+- Server-side MIME type validation (not just extension)
+- File extension whitelisting (images, documents, audio, video)
+- File size limit enforcement (10MB default)
+- Secure filename generation (timestamp + random string)
+- Directory traversal prevention
+- Proper file permissions (0644)
+- File content scanning framework
+
+**Access Control Integration:**
+- Public access ('all') - No authentication required
+- Logged-in access ('logged_in') - Requires authentication
+- Individual user permissions - Via Access model integration
+- Access counting and limit enforcement
+- Admin bypass for all operations
+- Access tracking on downloads
+
+**API Endpoints:**
+- `GET /api/folders` - List all folders
+- `POST /api/folders` - Create new folder
+- `GET /api/folders/{id}` - Get folder details
+- `PUT /api/folders/{id}` - Update folder
+- `DELETE /api/folders/{id}` - Delete folder
+- `GET /api/folders/{id}/contents` - Get folder contents
+- `POST /api/files/upload` - Upload file
+- `GET /api/files/{id}` - Get file details
+- `DELETE /api/files/{id}` - Delete file
+- `GET /api/files/{id}/download` - Download file
+
 ### 📋 Phase 3: Content Management (Week 3)
 - 3.1 Folder System
 - 3.2 Quiz System
@@ -231,13 +312,15 @@ src/
 │   ├── UserController.php   # User management (✅)
 │   ├── AdminController.php  # Admin operations (✅)
 │   ├── AccessController.php # Access control (✅)
-│   ├── FolderController.php # Folder management (to be implemented)
-│   ├── FileController.php   # File management (to be implemented)
+│   ├── FolderController.php # Folder management (✅)
+│   ├── FileController.php   # File management (✅)
 │   ├── QuizController.php   # Quiz management (to be implemented)
 │   └── SystemController.php # System operations (to be implemented)
 ├── models/        # Data models
 │   ├── User.php          # User model (✅)
-│   └── Access.php        # Access model (✅)
+│   ├── Access.php        # Access model (✅)
+│   ├── Folder.php        # Folder model (✅)
+│   └── File.php          # File model (✅)
 ├── services/      # Business logic services
 │   ├── AuthService.php   # Authentication logic (✅)
 │   └── AccessService.php # Access control logic (✅)
