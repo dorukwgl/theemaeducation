@@ -1,0 +1,188 @@
+<?php
+
+namespace EMA\Controllers;
+
+use EMA\Services\AuthService;
+use EMA\Utils\Validator;
+use EMA\Utils\Logger;
+use EMA\Core\Request;
+use EMA\Core\Response;
+
+class AuthController
+{
+    private AuthService $authService;
+    private Request $request;
+    private Response $response;
+
+    public function __construct()
+    {
+        $this->authService = new AuthService();
+        $this->request = new Request();
+        $this->response = new Response();
+    }
+
+    public function login(): void
+    {
+        try {
+            $data = $this->request->allInput();
+
+            $result = $this->authService->login($data);
+
+            if ($result['success']) {
+                $this->response->success($result['message'], $result['data']);
+            } else {
+                $this->response->error($result['message'], 401);
+            }
+        } catch (\Exception $e) {
+            Logger::error('Login endpoint error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->response->error('Login failed', 500);
+        }
+    }
+
+    public function register(): void
+    {
+        try {
+            $data = $this->request->allInput();
+
+            $result = $this->authService->register($data);
+
+            if ($result['success']) {
+                $this->response->success($result['message'], $result['data']);
+            } else {
+                if (isset($result['errors'])) {
+                    $this->response->validationError($result['errors'], $result['message']);
+                } else {
+                    $this->response->error($result['message'], 422);
+                }
+            }
+        } catch (\Exception $e) {
+            Logger::error('Registration endpoint error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->response->error('Registration failed', 500);
+        }
+    }
+
+    public function logout(): void
+    {
+        try {
+            $this->authService->logout();
+            $this->response->success('Logged out successfully');
+        } catch (\Exception $e) {
+            Logger::error('Logout endpoint error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->response->error('Logout failed', 500);
+        }
+    }
+
+    public function forgotPassword(): void
+    {
+        try {
+            $data = $this->request->allInput();
+
+            $result = $this->authService->requestPasswordReset($data['email'] ?? '');
+
+            if ($result['success']) {
+                $this->response->success($result['message']);
+            } else {
+                $this->response->error($result['message'], 400);
+            }
+        } catch (\Exception $e) {
+            Logger::error('Forgot password endpoint error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->response->error('Failed to request password reset', 500);
+        }
+    }
+
+    public function resetPassword(): void
+    {
+        try {
+            $data = $this->request->allInput();
+
+            $result = $this->authService->resetPassword(
+                $data['reset_id'] ?? '',
+                $data['token'] ?? '',
+                $data['new_password'] ?? ''
+            );
+
+            if ($result['success']) {
+                $this->response->success($result['message']);
+            } else {
+                if (isset($result['errors'])) {
+                    $this->response->validationError($result['errors'], $result['message']);
+                } else {
+                    $this->response->error($result['message'], 400);
+                }
+            }
+        } catch (\Exception $e) {
+            Logger::error('Reset password endpoint error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->response->error('Failed to reset password', 500);
+        }
+    }
+
+    public function changePassword(): void
+    {
+        try {
+            $data = $this->request->allInput();
+
+            $userId = $_SESSION['user_id'] ?? null;
+
+            if (!$userId) {
+                $this->response->error('Authentication required', 401);
+                return;
+            }
+
+            $result = $this->authService->changePassword(
+                $userId,
+                $data['current_password'] ?? '',
+                $data['new_password'] ?? ''
+            );
+
+            if ($result['success']) {
+                $this->response->success($result['message']);
+            } else {
+                if (isset($result['errors'])) {
+                    $this->response->validationError($result['errors'], $result['message']);
+                } else {
+                    $this->response->error($result['message'], 400);
+                }
+            }
+        } catch (\Exception $e) {
+            Logger::error('Change password endpoint error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->response->error('Failed to change password', 500);
+        }
+    }
+
+    public function me(): void
+    {
+        try {
+            $user = $this->authService->getCurrentUser();
+
+            if ($user) {
+                $this->response->success('User data retrieved', $user);
+            } else {
+                $this->response->error('Not authenticated', 401);
+            }
+        } catch (\Exception $e) {
+            Logger::error('Get current user endpoint error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->response->error('Failed to get user data', 500);
+        }
+    }
+}
