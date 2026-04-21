@@ -70,6 +70,16 @@ $router->get('/api/files/{id}/download', [FileController::class, 'download'], [A
 // Admin routes
 $router->post('/api/admin/grant', [AdminController::class, 'grant'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
 $router->post('/api/admin/approve-reset', [AdminController::class, 'approveReset'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
+$router->get('/api/admin/dashboard', [AdminController::class, 'dashboard'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
+$router->get('/api/admin/user-activity', [AdminController::class, 'userActivity'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
+$router->get('/api/admin/system-health', [AdminController::class, 'systemHealth'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
+$router->get('/api/admin/audit-log', [AdminController::class, 'auditLog'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
+$router->post('/api/admin/bulk-operations', [AdminController::class, 'createBulkOperation'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
+$router->get('/api/admin/bulk-operations/{id}', [AdminController::class, 'bulkOperationStatus'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
+$router->delete('/api/admin/bulk-operations/{id}', [AdminController::class, 'cancelBulkOperation'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
+$router->get('/api/admin/analytics', [AdminController::class, 'systemAnalytics'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
+$router->post('/api/admin/health-check', [AdminController::class, 'runHealthCheck'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
+$router->delete('/api/admin/audit-log', [AdminController::class, 'clearAuditLog'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
 
 // Access control routes
 $router->post('/api/access/batch-check', [AccessController::class, 'batchCheck'], [AuthMiddleware::class]);
