@@ -144,8 +144,8 @@ class FolderController
     }
 
     /**
-     * Get folder details
-     * GET /api/folders/{id}
+     * Get folder details with optional contents
+     * GET /api/folders/{id}?include_contents=true
      */
     public function show(int $id): void
     {
@@ -166,27 +166,58 @@ class FolderController
                 return;
             }
 
-            // Get folder contents
-            $contents = Folder::getFolderContents($id);
+            // Check if contents should be included
+            $includeContents = filter_var($this->request->getQueryParam('include_contents', 'false'), FILTER_VALIDATE_BOOLEAN);
+            $contents = [];
+            $accessibleFiles = 0;
 
-            // Filter files by user access if not admin
-            if ($currentUser['role'] !== 'admin') {
-                $contents = array_filter($contents, function($file) use ($currentUser) {
-                    return File::checkFileAccess($currentUser['id'], $file['id']);
-                });
-                $contents = array_values($contents);
+            if ($includeContents) {
+                // Get folder contents
+                $contents = Folder::getFolderContents($id);
+
+                // Filter files by user access if not admin
+                if ($currentUser['role'] !== 'admin') {
+                    foreach ($contents as $file) {
+                        $hasAccess = File::checkFileAccess($currentUser['id'], $file['id']);
+                        if ($hasAccess) {
+                            $accessibleFiles++;
+                        }
+                    }
+                    $contents = array_filter($contents, function($file) use ($currentUser) {
+                        return File::checkFileAccess($currentUser['id'], $file['id']);
+                    });
+                    $contents = array_values($contents);
+                } else {
+                    $accessibleFiles = count($contents);
+                }
+            }
+
+            // Build access information
+            $accessInfo = [
+                'has_access' => true,
+                'access_level' => $currentUser['role'] === 'admin' ? 'admin' : 'user',
+                'can_view' => true,
+                'accessible_files_count' => $includeContents ? $accessibleFiles : 0,
+                'total_files_count' => $includeContents ? count($contents) : 0
+            ];
+
+            $responseData = [
+                'folder' => $folder,
+                'access_info' => $accessInfo
+            ];
+
+            if ($includeContents) {
+                $responseData['files'] = $contents;
+                $responseData['total_files'] = count($contents);
             }
 
             Logger::info('Folder details accessed', [
                 'user_id' => $currentUser['id'],
-                'folder_id' => $id
+                'folder_id' => $id,
+                'include_contents' => $includeContents
             ]);
 
-            $this->response->success('Folder details retrieved successfully', [
-                'folder' => $folder,
-                'files' => $contents,
-                'total_files' => count($contents)
-            ]);
+            $this->response->success('Folder details retrieved successfully', $responseData);
         } catch (\Exception $e) {
             Logger::error('Folder details error', [
                 'folder_id' => $id,
@@ -336,61 +367,6 @@ class FolderController
                 'trace' => $e->getTraceAsString()
             ]);
             $this->response->error('Failed to delete folder', 500);
-        }
-    }
-
-    /**
-     * Get folder contents
-     * GET /api/folders/{id}/contents
-     */
-    public function contents(int $id): void
-    {
-        try {
-            $currentUser = AuthMiddleware::getCurrentUser();
-
-            // Check authentication
-            if (!$currentUser) {
-                $this->response->error('Authentication required', 401);
-                return;
-            }
-
-            // Get folder details
-            $folder = Folder::findById($id);
-
-            if (!$folder) {
-                $this->response->error('Folder not found', 404);
-                return;
-            }
-
-            // Get folder contents
-            $contents = Folder::getFolderContents($id);
-
-            // Filter files by user access if not admin
-            if ($currentUser['role'] !== 'admin') {
-                $contents = array_filter($contents, function($file) use ($currentUser) {
-                    return File::checkFileAccess($currentUser['id'], $file['id']);
-                });
-                $contents = array_values($contents);
-            }
-
-            Logger::info('Folder contents accessed', [
-                'user_id' => $currentUser['id'],
-                'folder_id' => $id,
-                'files_count' => count($contents)
-            ]);
-
-            $this->response->success('Folder contents retrieved successfully', [
-                'folder' => $folder,
-                'files' => $contents,
-                'total' => count($contents)
-            ]);
-        } catch (\Exception $e) {
-            Logger::error('Folder contents error', [
-                'folder_id' => $id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            $this->response->error('Failed to retrieve folder contents', 500);
         }
     }
 

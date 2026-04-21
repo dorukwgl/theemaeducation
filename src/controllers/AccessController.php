@@ -93,6 +93,101 @@ class AccessController
     }
 
     /**
+     * Batch check access permissions for multiple items
+     * POST /api/access/batch-check
+     */
+    public function batchCheck(): void
+    {
+        try {
+            $currentUser = AuthMiddleware::getCurrentUser();
+
+            // Check authentication
+            if (!$currentUser) {
+                $this->response->error('Authentication required', 401);
+                return;
+            }
+
+            $data = $this->request->allInput();
+
+            // Validate input
+            $validation = Validator::make($data, [
+                'item_ids' => 'required|array',
+                'item_type' => 'required|in:file,quiz_set'
+            ]);
+
+            if (!$validation->validate()) {
+                $this->response->validationError($validation->getErrors(), 'Validation failed');
+                return;
+            }
+
+            $itemIds = $data['item_ids'];
+            $itemType = $data['item_type'];
+            $userId = $currentUser['id'];
+
+            // Validate item IDs array (max 100 items)
+            if (count($itemIds) > 100) {
+                $this->response->error('Maximum 100 items allowed per batch check', 400);
+                return;
+            }
+
+            // Validate all item IDs are integers
+            foreach ($itemIds as $itemId) {
+                if (!is_numeric($itemId) || (int) $itemId <= 0) {
+                    $this->response->error('Invalid item ID in array', 400);
+                    return;
+                }
+            }
+
+            // Batch check access for all items
+            $results = [];
+            $accessibleCount = 0;
+            $deniedCount = 0;
+
+            foreach ($itemIds as $itemId) {
+                $itemId = (int) $itemId;
+                $hasAccess = $this->accessService->checkAccess($userId, $itemId, $itemType);
+
+                $results[] = [
+                    'item_id' => $itemId,
+                    'item_type' => $itemType,
+                    'has_access' => $hasAccess
+                ];
+
+                if ($hasAccess) {
+                    $accessibleCount++;
+                } else {
+                    $deniedCount++;
+                }
+            }
+
+            Logger::info('Batch access check completed', [
+                'user_id' => $userId,
+                'item_type' => $itemType,
+                'total_items' => count($itemIds),
+                'accessible_count' => $accessibleCount,
+                'denied_count' => $deniedCount,
+                'ip' => Security::getRealIp()
+            ]);
+
+            $this->response->success('Batch access check completed', [
+                'results' => $results,
+                'summary' => [
+                    'total_items' => count($itemIds),
+                    'accessible_count' => $accessibleCount,
+                    'denied_count' => $deniedCount,
+                    'accessibility_rate' => count($itemIds) > 0 ? round(($accessibleCount / count($itemIds)) * 100, 2) . '%' : '0%'
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Logger::error('Batch access check error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->response->error('Failed to complete batch access check', 500);
+        }
+    }
+
+    /**
      * Increment access count for current user
      * POST /api/access/increment
      */

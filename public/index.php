@@ -25,10 +25,11 @@ use EMA\Controllers\AuthController;
 use EMA\Controllers\UserController;
 use EMA\Controllers\FolderController;
 use EMA\Controllers\FileController;
-use EMA\Controllers\QuizController;
 use EMA\Controllers\AdminController;
 use EMA\Controllers\AccessController;
 use EMA\Controllers\SystemController;
+use EMA\Controllers\QuizController;
+use EMA\Controllers\NoticeController;
 use EMA\Middleware\AuthMiddleware;
 use EMA\Middleware\RateLimitMiddleware;
 use EMA\Middleware\ValidationMiddleware;
@@ -42,6 +43,10 @@ $router = $app->getRouter();
 $router->post('/api/auth/login', [AuthController::class, 'login']);
 $router->post('/api/auth/register', [AuthController::class, 'register']);
 $router->post('/api/auth/logout', [AuthController::class, 'logout'], [AuthMiddleware::class]);
+$router->post('/api/auth/forgot-password', [AuthController::class, 'forgotPassword']);
+$router->post('/api/auth/reset-password', [AuthController::class, 'resetPassword']);
+$router->post('/api/auth/change-password', [AuthController::class, 'changePassword'], [AuthMiddleware::class]);
+$router->get('/api/auth/me', [AuthController::class, 'me'], [AuthMiddleware::class]);
 
 // User routes
 $router->get('/api/users', [UserController::class, 'index'], [AuthMiddleware::class]);
@@ -55,7 +60,6 @@ $router->post('/api/folders', [FolderController::class, 'store'], [AuthMiddlewar
 $router->get('/api/folders/{id}', [FolderController::class, 'show'], [AuthMiddleware::class]);
 $router->put('/api/folders/{id}', [FolderController::class, 'update'], [AuthMiddleware::class]);
 $router->delete('/api/folders/{id}', [FolderController::class, 'delete'], [AuthMiddleware::class]);
-$router->get('/api/folders/{id}/contents', [FolderController::class, 'contents'], [AuthMiddleware::class]);
 
 // File routes
 $router->post('/api/files/upload', [FileController::class, 'upload'], [AuthMiddleware::class]);
@@ -63,25 +67,12 @@ $router->get('/api/files/{id}', [FileController::class, 'show'], [AuthMiddleware
 $router->delete('/api/files/{id}', [FileController::class, 'delete'], [AuthMiddleware::class]);
 $router->get('/api/files/{id}/download', [FileController::class, 'download'], [AuthMiddleware::class]);
 
-// Quiz routes
-$router->get('/api/quiz-sets', [QuizController::class, 'index'], [AuthMiddleware::class]);
-$router->post('/api/quiz-sets', [QuizController::class, 'store'], [AuthMiddleware::class]);
-$router->get('/api/quiz-sets/{id}', [QuizController::class, 'show'], [AuthMiddleware::class]);
-$router->put('/api/quiz-sets/{id}', [QuizController::class, 'update'], [AuthMiddleware::class]);
-$router->delete('/api/quiz-sets/{id}', [QuizController::class, 'delete'], [AuthMiddleware::class]);
-$router->get('/api/quiz-sets/{id}/questions', [QuizController::class, 'questions'], [AuthMiddleware::class]);
-$router->post('/api/quiz-sets/{id}/questions', [QuizController::class, 'storeQuestion'], [AuthMiddleware::class]);
-$router->delete('/api/quiz-sets/{id}/questions/{question_id}', [QuizController::class, 'deleteQuestion'], [AuthMiddleware::class]);
-
 // Admin routes
-$router->get('/api/admins', [AdminController::class, 'index'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
 $router->post('/api/admin/grant', [AdminController::class, 'grant'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
-$router->get('/api/admin/list', [AdminController::class, 'list'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
 $router->post('/api/admin/approve-reset', [AdminController::class, 'approveReset'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
 
 // Access control routes
-$router->post('/api/access/check', [AccessController::class, 'check']);
-$router->post('/api/access/increment', [AccessController::class, 'increment'], [AuthMiddleware::class]);
+$router->post('/api/access/batch-check', [AccessController::class, 'batchCheck'], [AuthMiddleware::class]);
 $router->post('/api/access/grant', [AccessController::class, 'grant'], [AuthMiddleware::class]);
 $router->get('/api/access/permissions', [AccessController::class, 'permissions'], [AuthMiddleware::class]);
 $router->post('/api/access/all-users', [AccessController::class, 'grantAllUsers'], [AuthMiddleware::class]);
@@ -95,6 +86,35 @@ $router->post('/api/notices', [SystemController::class, 'storeNotice'], [AuthMid
 $router->delete('/api/notices/{id}', [SystemController::class, 'deleteNotice'], [AuthMiddleware::class]);
 $router->post('/api/analytics/track-download', [SystemController::class, 'trackDownload']);
 $router->post('/api/content/free-access', [SystemController::class, 'freeAccess'], [AuthMiddleware::class]);
+
+// Quiz routes
+$router->get('/api/quiz-sets', [QuizController::class, 'index'], [AuthMiddleware::class]);
+$router->get('/api/quiz-sets/{id}', [QuizController::class, 'show'], [AuthMiddleware::class]);
+$router->post('/api/quiz-sets', [QuizController::class, 'store'], [AuthMiddleware::class]);
+$router->put('/api/quiz-sets/{id}', [QuizController::class, 'update'], [AuthMiddleware::class]);
+$router->delete('/api/quiz-sets/{id}', [QuizController::class, 'delete'], [AuthMiddleware::class]);
+$router->get('/api/quiz-sets/{id}/questions', [QuizController::class, 'questions'], [AuthMiddleware::class]);
+$router->post('/api/quiz-sets/{id}/questions', [QuizController::class, 'createQuestion'], [AuthMiddleware::class]);
+$router->put('/api/quiz-sets/{id}/questions/{question_id}', [QuizController::class, 'updateQuestion'], [AuthMiddleware::class]);
+$router->delete('/api/quiz-sets/{id}/questions/{question_id}', [QuizController::class, 'deleteQuestion'], [AuthMiddleware::class]);
+$router->post('/api/quiz-sets/{id}/start', [QuizController::class, 'startAttempt'], [AuthMiddleware::class]);
+$router->post('/api/quiz-sets/{id}/submit', [QuizController::class, 'submitAttempt'], [AuthMiddleware::class]);
+$router->get('/api/quiz-sets/{id}/statistics', [QuizController::class, 'statistics'], [AuthMiddleware::class]);
+$router->post('/api/quiz-sets/batch-check', [QuizController::class, 'batchCheck'], [AuthMiddleware::class]);
+
+// Notice routes
+$router->get('/api/notices', [NoticeController::class, 'index']);
+$router->post('/api/notices', [NoticeController::class, 'store'], [AuthMiddleware::class]);
+$router->get('/api/notices/{id}', [NoticeController::class, 'show'], [AuthMiddleware::class]);
+$router->put('/api/notices/{id}', [NoticeController::class, 'update'], [AuthMiddleware::class]);
+$router->delete('/api/notices/{id}', [NoticeController::class, 'delete'], [AuthMiddleware::class]);
+$router->post('/api/notices/{id}/upload-attachment', [NoticeController::class, 'uploadAttachment'], [AuthMiddleware::class]);
+$router->delete('/api/notices/{id}/attachment', [NoticeController::class, 'deleteAttachment'], [AuthMiddleware::class]);
+$router->post('/api/notices/{id}/view', [NoticeController::class, 'trackView'], [AuthMiddleware::class]);
+$router->post('/api/notices/{id}/dismiss', [NoticeController::class, 'dismiss'], [AuthMiddleware::class]);
+$router->get('/api/notices/dismissed', [NoticeController::class, 'dismissed'], [AuthMiddleware::class]);
+$router->get('/api/notices/{id}/statistics', [NoticeController::class, 'statistics'], [AuthMiddleware::class]);
+$router->post('/api/notices/bulk-update-status', [NoticeController::class, 'bulkUpdateStatus'], [AuthMiddleware::class]);
 
 // Run the application
 $app->run();
