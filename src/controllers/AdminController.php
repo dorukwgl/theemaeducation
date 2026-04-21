@@ -51,7 +51,7 @@ class AdminController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::securityEvent('Unauthorized admin grant attempt', [
+                Logger::logSecurityEvent('Unauthorized admin grant attempt', [
                     'user_id' => $currentUser['id'] ?? null,
                     'ip' => Security::getRealIp()
                 ]);
@@ -83,7 +83,7 @@ class AdminController
             // Check if email matches (if provided) for security
             if (isset($data['email'])) {
                 if ($user->getEmail() !== $data['email']) {
-                    Logger::securityEvent('Admin grant email mismatch', [
+                    Logger::logSecurityEvent('Admin grant email mismatch', [
                         'target_user_id' => $userId,
                         'provided_email' => $data['email'],
                         'actual_email' => $user->getEmail(),
@@ -96,7 +96,7 @@ class AdminController
             }
 
             // Check if user is already admin
-            if (User::isAdmin($userId)) {
+            if (User::isAdminById($userId)) {
                 $this->response->error('User is already an admin', 400);
                 return;
             }
@@ -153,7 +153,7 @@ class AdminController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::securityEvent('Unauthorized password reset approval attempt', [
+                Logger::logSecurityEvent('Unauthorized password reset approval attempt', [
                     'user_id' => $currentUser['id'] ?? null,
                     'ip' => Security::getRealIp()
                 ]);
@@ -206,7 +206,7 @@ class AdminController
             $result = $updateStmt->execute();
 
             if ($result) {
-                Logger::securityEvent('Password reset ' . $action . 'ed', [
+                Logger::logSecurityEvent('Password reset ' . $action . 'ed', [
                     'reset_id' => $resetId,
                     'user_id' => $resetRequest['user_id'],
                     'email' => $resetRequest['email'],

@@ -69,7 +69,7 @@ class FolderController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::securityEvent('Unauthorized folder creation attempt', [
+                Logger::logSecurityEvent('Unauthorized folder creation attempt', [
                     'user_id' => $currentUser['id'] ?? null,
                     'ip' => Security::getRealIp()
                 ]);
@@ -120,7 +120,7 @@ class FolderController
             if ($folderId) {
                 $folder = Folder::findById($folderId);
 
-                Logger::securityEvent('Folder created', [
+                Logger::logSecurityEvent('Folder created', [
                     'admin_id' => $currentUser['id'],
                     'folder_id' => $folderId,
                     'folder_name' => $data['name'],
@@ -208,7 +208,7 @@ class FolderController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::securityEvent('Unauthorized folder update attempt', [
+                Logger::logSecurityEvent('Unauthorized folder update attempt', [
                     'user_id' => $currentUser['id'] ?? null,
                     'folder_id' => $id,
                     'ip' => Security::getRealIp()
@@ -259,7 +259,7 @@ class FolderController
             if ($result) {
                 $folder = Folder::findById($id);
 
-                Logger::securityEvent('Folder updated', [
+                Logger::logSecurityEvent('Folder updated', [
                     'admin_id' => $currentUser['id'],
                     'folder_id' => $id,
                     'updates' => array_keys($data),
@@ -291,7 +291,7 @@ class FolderController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::securityEvent('Unauthorized folder deletion attempt', [
+                Logger::logSecurityEvent('Unauthorized folder deletion attempt', [
                     'user_id' => $currentUser['id'] ?? null,
                     'folder_id' => $id,
                     'ip' => Security::getRealIp()
@@ -318,7 +318,7 @@ class FolderController
             $result = Folder::delete($id);
 
             if ($result) {
-                Logger::securityEvent('Folder deleted with cascade', [
+                Logger::logSecurityEvent('Folder deleted with cascade', [
                     'admin_id' => $currentUser['id'],
                     'folder_id' => $id,
                     'folder_name' => $folder['name'],

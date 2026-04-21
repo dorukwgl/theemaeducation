@@ -88,7 +88,7 @@ class UserController
 
             // Users can only view their own profile, admins can view any
             if ($currentUser['role'] !== 'admin' && $currentUserId !== $id) {
-                Logger::securityEvent('Unauthorized user profile access attempt', [
+                Logger::logSecurityEvent('Unauthorized user profile access attempt', [
                     'user_id' => $currentUserId,
                     'target_user_id' => $id,
                     'ip' => Security::getRealIp()
@@ -139,7 +139,7 @@ class UserController
 
             // Users can only update their own profile, admins can update any
             if ($currentUser['role'] !== 'admin' && $currentUserId !== $id) {
-                Logger::securityEvent('Unauthorized user profile update attempt', [
+                Logger::logSecurityEvent('Unauthorized user profile update attempt', [
                     'user_id' => $currentUserId,
                     'target_user_id' => $id,
                     'ip' => Security::getRealIp()
@@ -197,7 +197,7 @@ class UserController
             $result = User::update($id, $data);
 
             if ($result) {
-                Logger::securityEvent('User profile updated', [
+                Logger::logSecurityEvent('User profile updated', [
                     'updated_user_id' => $id,
                     'updated_by' => $currentUserId,
                     'fields' => array_keys($data)
@@ -235,7 +235,7 @@ class UserController
 
             // Check if current user is admin
             if ($currentUser['role'] !== 'admin') {
-                Logger::securityEvent('Unauthorized user deletion attempt', [
+                Logger::logSecurityEvent('Unauthorized user deletion attempt', [
                     'user_id' => $currentUser['id'],
                     'target_user_id' => $id,
                     'ip' => Security::getRealIp()
@@ -261,7 +261,7 @@ class UserController
             $result = User::deleteUserCascade($id);
 
             if ($result) {
-                Logger::securityEvent('User deleted with cascade cleanup', [
+                Logger::logSecurityEvent('User deleted with cascade cleanup', [
                     'deleted_user_id' => $id,
                     'deleted_user_email' => $userToDelete->getEmail(),
                     'deleted_by' => $currentUser['id'],

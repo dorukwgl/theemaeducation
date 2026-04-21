@@ -71,7 +71,7 @@ class AccessController
                     'message' => 'You have access to this item'
                 ]);
             } else {
-                Logger::securityEvent('Access check denied', [
+                Logger::logSecurityEvent('Access check denied', [
                     'user_id' => $userId,
                     'item_id' => $itemId,
                     'item_type' => $itemType,
@@ -152,7 +152,7 @@ class AccessController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::securityEvent('Unauthorized access grant attempt', [
+                Logger::logSecurityEvent('Unauthorized access grant attempt', [
                     'user_id' => $currentUser['id'] ?? null,
                     'ip' => Security::getRealIp()
                 ]);
@@ -191,7 +191,7 @@ class AccessController
             if ($result['success']) {
                 $message = $action === 'grant' ? 'Access granted successfully' : 'Access revoked successfully';
 
-                Logger::securityEvent('Access ' . $action . 'ed', [
+                Logger::logSecurityEvent('Access ' . $action . 'ed', [
                     'admin_id' => $currentUser['id'],
                     'target_user_id' => $userId,
                     'item_id' => $itemId,
@@ -223,7 +223,7 @@ class AccessController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::securityEvent('Unauthorized permission list attempt', [
+                Logger::logSecurityEvent('Unauthorized permission list attempt', [
                     'user_id' => $currentUser['id'] ?? null,
                     'ip' => Security::getRealIp()
                 ]);
@@ -294,7 +294,7 @@ class AccessController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::securityEvent('Unauthorized public access attempt', [
+                Logger::logSecurityEvent('Unauthorized public access attempt', [
                     'user_id' => $currentUser['id'] ?? null,
                     'ip' => Security::getRealIp()
                 ]);
@@ -326,7 +326,7 @@ class AccessController
             if ($result) {
                 $message = $grant ? 'Public access granted successfully' : 'Public access revoked successfully';
 
-                Logger::securityEvent('Public access ' . ($grant ? 'granted' : 'revoked'), [
+                Logger::logSecurityEvent('Public access ' . ($grant ? 'granted' : 'revoked'), [
                     'admin_id' => $currentUser['id'],
                     'item_id' => $itemId,
                     'item_type' => $itemType,
@@ -361,7 +361,7 @@ class AccessController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::securityEvent('Unauthorized public access list attempt', [
+                Logger::logSecurityEvent('Unauthorized public access list attempt', [
                     'user_id' => $currentUser['id'] ?? null,
                     'ip' => Security::getRealIp()
                 ]);
@@ -410,7 +410,7 @@ class AccessController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::securityEvent('Unauthorized logged-in access attempt', [
+                Logger::logSecurityEvent('Unauthorized logged-in access attempt', [
                     'user_id' => $currentUser['id'] ?? null,
                     'ip' => Security::getRealIp()
                 ]);
@@ -442,7 +442,7 @@ class AccessController
             if ($result) {
                 $message = $grant ? 'Logged-in access granted successfully' : 'Logged-in access revoked successfully';
 
-                Logger::securityEvent('Logged-in access ' . ($grant ? 'granted' : 'revoked'), [
+                Logger::logSecurityEvent('Logged-in access ' . ($grant ? 'granted' : 'revoked'), [
                     'admin_id' => $currentUser['id'],
                     'item_id' => $itemId,
                     'item_type' => $itemType,
@@ -477,7 +477,7 @@ class AccessController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::securityEvent('Unauthorized logged-in access list attempt', [
+                Logger::logSecurityEvent('Unauthorized logged-in access list attempt', [
                     'user_id' => $currentUser['id'] ?? null,
                     'ip' => Security::getRealIp()
                 ]);

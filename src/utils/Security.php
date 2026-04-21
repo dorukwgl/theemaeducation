@@ -35,7 +35,7 @@ class Security
         }
 
         if (!hash_equals($sessionToken, $token)) {
-            Logger::securityEvent('CSRF token mismatch');
+            Logger::logSecurityEvent('CSRF token mismatch');
             return false;
         }
 
@@ -74,7 +74,7 @@ class Security
         $result = password_verify($password, $hash);
 
         if (!$result) {
-            Logger::securityEvent('Password verification failed', [
+            Logger::logSecurityEvent('Password verification failed', [
                 'hash_length' => strlen($hash)
             ]);
         }

@@ -393,7 +393,7 @@ class User
             // Commit transaction
             Database::commit();
 
-            Logger::securityEvent('Admin privileges granted', [
+            Logger::logSecurityEvent('Admin privileges granted', [
                 'user_id' => $userId,
                 'email' => $user->getEmail(),
                 'granted_by' => $grantedBy
@@ -435,7 +435,7 @@ class User
             // Commit transaction
             Database::commit();
 
-            Logger::securityEvent('Admin privileges revoked', [
+            Logger::logSecurityEvent('Admin privileges revoked', [
                 'user_id' => $userId,
                 'revoked_by' => $_SESSION['user_id'] ?? null
             ]);
@@ -452,7 +452,7 @@ class User
         }
     }
 
-    public static function isAdmin(int $userId): bool
+    public static function isAdminById(int $userId): bool
     {
         try {
             $stmt = Database::prepare("SELECT id FROM admin_users WHERE user_id = ? LIMIT 1");
@@ -513,22 +513,6 @@ class User
             ];
         }
     }
-    {
-        try {
-            $stmt = Database::prepare("SELECT id FROM admin_users WHERE user_id = ? LIMIT 1");
-            $stmt->bind_param('i', $userId);
-            $stmt->execute();
-            $stmt->store_result();
-
-            return $stmt->num_rows > 0;
-        } catch (\Exception $e) {
-            Logger::error('Error checking admin status', [
-                'user_id' => $userId,
-                'error' => $e->getMessage()
-            ]);
-            return false;
-        }
-    }
 
     public static function deleteUserCascade(int $userId): bool
     {
@@ -561,7 +545,7 @@ class User
             Database::commit();
 
             if ($result) {
-                Logger::securityEvent('User deleted with cascade cleanup', [
+                Logger::logSecurityEvent('User deleted with cascade cleanup', [
                     'user_id' => $userId,
                     'admin_id' => $_SESSION['user_id'] ?? null
                 ]);

@@ -322,7 +322,7 @@ class File
     {
         try {
             // Check if user is admin
-            if (\EMA\Models\User::isAdmin($userId)) {
+            if (\EMA\Models\User::isAdminById($userId)) {
                 return true;
             }
 

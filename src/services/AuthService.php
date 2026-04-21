@@ -288,7 +288,7 @@ class AuthService
             $updateStmt->bind_param('si', $tokenHash, $resetId);
             $updateStmt->execute();
 
-            Logger::securityEvent('Password reset requested', [
+            Logger::logSecurityEvent('Password reset requested', [
                 'user_id' => $user->getId(),
                 'email' => $email
             ]);
@@ -366,7 +366,7 @@ class AuthService
                 $updateStmt->bind_param('i', $resetId);
                 $updateStmt->execute();
 
-                Logger::securityEvent('Password reset completed', [
+                Logger::logSecurityEvent('Password reset completed', [
                     'user_id' => $user->getId()
                 ]);
 
@@ -437,7 +437,7 @@ class AuthService
         try {
             User::update($userId, ['password' => $newPassword]);
 
-            Logger::securityEvent('Password changed', [
+            Logger::logSecurityEvent('Password changed', [
                 'user_id' => $userId
             ]);
 
@@ -497,7 +497,7 @@ class AuthService
         if ($attemptsData['failed_count'] >= self::MAX_LOGIN_ATTEMPTS) {
             $attemptsData['locked_until'] = time() + self::LOCKOUT_DURATION;
 
-            Logger::securityEvent('Account locked due to failed attempts', [
+            Logger::logSecurityEvent('Account locked due to failed attempts', [
                 'ip' => $ip,
                 'email' => $email,
                 'failed_count' => $attemptsData['failed_count']

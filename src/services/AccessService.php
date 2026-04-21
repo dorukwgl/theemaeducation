@@ -93,7 +93,7 @@ class AccessService
     {
         try {
             // Check if user is admin (no cache needed, always true)
-            if (User::isAdmin($userId)) {
+            if (User::isAdminById($userId)) {
                 return true;
             }
 

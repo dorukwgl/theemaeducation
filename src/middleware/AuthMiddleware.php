@@ -23,7 +23,7 @@ class AuthMiddleware
 
         // Check if user is authenticated
         if (!$this->isAuthenticated()) {
-            Logger::securityEvent('Unauthenticated access attempt', [
+            Logger::logSecurityEvent('Unauthenticated access attempt', [
                 'ip' => Security::getRealIp(),
                 'uri' => Security::getRequestUri(),
                 'user_agent' => Security::getUserAgent()
@@ -39,7 +39,7 @@ class AuthMiddleware
 
         // Check if user has required roles
         if (!empty($this->requiredRoles) && !$this->hasRequiredRole()) {
-            Logger::securityEvent('Unauthorized access attempt', [
+            Logger::logSecurityEvent('Unauthorized access attempt', [
                 'user_id' => $_SESSION[\EMA\Config\Constants::SESSION_USER_ID] ?? null,
                 'required_roles' => $this->requiredRoles,
                 'user_role' => $_SESSION[\EMA\Config\Constants::SESSION_USER_ROLE] ?? null,

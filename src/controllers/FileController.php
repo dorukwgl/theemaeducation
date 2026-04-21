@@ -34,7 +34,7 @@ class FileController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::securityEvent('Unauthorized file upload attempt', [
+                Logger::logSecurityEvent('Unauthorized file upload attempt', [
                     'user_id' => $currentUser['id'] ?? null,
                     'ip' => Security::getRealIp()
                 ]);
@@ -149,7 +149,7 @@ class FileController
             if ($fileId) {
                 $file = File::findById($fileId);
 
-                Logger::securityEvent('File uploaded', [
+                Logger::logSecurityEvent('File uploaded', [
                     'admin_id' => $currentUser['id'],
                     'file_id' => $fileId,
                     'folder_id' => $folderId,
@@ -205,7 +205,7 @@ class FileController
 
             // Check file access
             if (!File::checkFileAccess($currentUser['id'], $id)) {
-                Logger::securityEvent('Unauthorized file access attempt', [
+                Logger::logSecurityEvent('Unauthorized file access attempt', [
                     'user_id' => $currentUser['id'],
                     'file_id' => $id,
                     'ip' => Security::getRealIp()
@@ -248,7 +248,7 @@ class FileController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::securityEvent('Unauthorized file deletion attempt', [
+                Logger::logSecurityEvent('Unauthorized file deletion attempt', [
                     'user_id' => $currentUser['id'] ?? null,
                     'file_id' => $id,
                     'ip' => Security::getRealIp()
@@ -275,7 +275,7 @@ class FileController
             $result = File::delete($id);
 
             if ($result) {
-                Logger::securityEvent('File deleted with cascade', [
+                Logger::logSecurityEvent('File deleted with cascade', [
                     'admin_id' => $currentUser['id'],
                     'file_id' => $id,
                     'file_name' => $file['name'],
@@ -321,7 +321,7 @@ class FileController
 
             // Check file access
             if (!File::checkFileAccess($currentUser['id'], $id)) {
-                Logger::securityEvent('Unauthorized file download attempt', [
+                Logger::logSecurityEvent('Unauthorized file download attempt', [
                     'user_id' => $currentUser['id'],
                     'file_id' => $id,
                     'ip' => Security::getRealIp()
@@ -336,7 +336,7 @@ class FileController
             $uploadsPath = realpath(ROOT_PATH . '/uploads/files/');
 
             if (!$realPath || strpos($realPath, $uploadsPath) !== 0) {
-                Logger::securityEvent('File path traversal attempt', [
+                Logger::logSecurityEvent('File path traversal attempt', [
                     'user_id' => $currentUser['id'],
                     'file_id' => $id,
                     'file_path' => $file['file_path'],

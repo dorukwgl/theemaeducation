@@ -18,7 +18,7 @@ class Access
     {
         try {
             // Check if user is admin (always has access)
-            if (User::isAdmin($userId)) {
+            if (User::isAdminById($userId)) {
                 return true;
             }
 

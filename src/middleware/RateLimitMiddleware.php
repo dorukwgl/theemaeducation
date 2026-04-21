@@ -39,7 +39,7 @@ class RateLimitMiddleware
 
         // Check rate limit for IP
         if (!$this->checkRateLimit('ip', $this->ip)) {
-            Logger::securityEvent('Rate limit exceeded for IP', [
+            Logger::logSecurityEvent('Rate limit exceeded for IP', [
                 'ip' => $this->ip,
                 'endpoint' => Security::getRequestUri()
             ]);
@@ -54,7 +54,7 @@ class RateLimitMiddleware
 
         // Check rate limit for user if authenticated
         if (!empty($this->userId) && !$this->checkRateLimit('user', $this->userId)) {
-            Logger::securityEvent('Rate limit exceeded for user', [
+            Logger::logSecurityEvent('Rate limit exceeded for user', [
                 'user_id' => $this->userId,
                 'ip' => $this->ip,
                 'endpoint' => Security::getRequestUri()
