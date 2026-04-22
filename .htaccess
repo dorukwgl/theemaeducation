@@ -1,0 +1,18 @@
+# EMA Education Platform - Root .htaccess
+# Redirects all traffic to the public directory for security
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Redirect to public directory
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ /public/$1 [L]
+</IfModule>
+
+# Prevent access to this file
+<Files .htaccess>
+    Require all denied
+</Files>
+
+# Prevent directory listing
+Options -Indexes

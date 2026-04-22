@@ -6,6 +6,14 @@
     # RewriteBase (uncomment if needed)
     # RewriteBase /
 
+    # Force HTTPS (uncomment if using HTTPS)
+    # RewriteCond %{HTTPS} off
+    # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # Remove www from URL (optional - comment out to keep www)
+    # RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+    # RewriteRule ^ http://%1%{REQUEST_URI} [L,R=301]
+
     # Redirect all requests to index.php
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
@@ -97,11 +105,47 @@ ServerSignature Off
     RewriteRule ^storage/ - [F,L]
     RewriteRule ^logs/ - [F,L]
     RewriteRule ^tests/ - [F,L]
+    RewriteRule ^database/ - [F,L]
     RewriteRule ^\.env - [F,L]
     RewriteRule ^composer\.(json|lock) - [F,L]
+    RewriteRule ^package\.(json|lock) - [F,L]
+    RewriteRule ^phpunit\.xml - [F,L]
+    RewriteRule ^\.git - [F,L]
 </IfModule>
+
+# Additional security measures for sensitive files
+<FilesMatch "(^\.|^.*\.(log|sql|ini|conf|env)$)">
+    Require all denied
+</FilesMatch>
+
+# Protect against XML-RPC attacks
+<Files xmlrpc.php>
+    Require all denied
+</Files>
 
 # Limit request methods
 <LimitExcept GET POST PUT DELETE OPTIONS>
     Require all denied
 </LimitExcept>
+
+# Request size limits (prevents large request attacks)
+LimitRequestBody 10485760
+LimitRequestFields 100
+LimitRequestLine 8190
+LimitRequestFieldSize 8190
+
+# Prevent session fixation
+<IfModule mod_php.c>
+    php_flag session.cookie_httponly On
+    php_flag session.cookie_secure Off
+    php_flag session.use_strict_mode On
+    php_flag session.cookie_samesite "Lax"
+</IfModule>
+
+# Disable PHP error display in production
+<IfModule mod_php.c>
+    php_flag display_errors Off
+    php_flag display_startup_errors Off
+    php_value error_reporting E_ALL
+    php_flag log_errors On
+</IfModule>
