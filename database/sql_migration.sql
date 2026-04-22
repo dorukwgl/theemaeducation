@@ -36,15 +36,79 @@ CREATE TABLE IF NOT EXISTS `folders` (
   `is_active` tinyint(1) DEFAULT '1',
   `created_by` int DEFAULT NULL,
   `access_type` enum('all','logged_in','private') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT 'private',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `file_count_cache` int DEFAULT 0,
+  `is_favorite` tinyint(1) DEFAULT 0,
   PRIMARY KEY (`id`),
   KEY `idx_folders_parent` (`parent_id`),
   KEY `idx_folders_active` (`is_active`),
   KEY `idx_folders_created_by` (`created_by`),
   KEY `idx_folders_access_type` (`access_type`),
+  KEY `idx_folders_favorite` (`is_favorite`),
+  KEY `idx_folders_created_at` (`created_at` DESC),
   CONSTRAINT `fk_folders_parent` FOREIGN KEY (`parent_id`)
     REFERENCES `folders`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Folder Access Permissions Table
+CREATE TABLE IF NOT EXISTS `folder_access_permissions` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `folder_id` int NOT NULL,
+  `user_id` int NOT NULL,
+  `access_level` enum('read','write','admin') NOT NULL DEFAULT 'read',
+  `granted_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `granted_by` int DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `expires_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_folder_user` (`folder_id`, `user_id`),
+  KEY `idx_folder_access_user` (`user_id`),
+  KEY `idx_folder_access_folder` (`folder_id`),
+  KEY `idx_folder_access_active` (`is_active`),
+  KEY `idx_folder_access_created_at` (`granted_at` DESC),
+  CONSTRAINT `fk_folder_access_folder` FOREIGN KEY (`folder_id`)
+    REFERENCES `folders`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_folder_access_user` FOREIGN KEY (`user_id`)
+    REFERENCES `users`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_folder_access_granted_by` FOREIGN KEY (`granted_by`)
+    REFERENCES `users`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Folder Activity Table
+CREATE TABLE IF NOT EXISTS `folder_activity` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `folder_id` int NOT NULL,
+  `user_id` int DEFAULT NULL,
+  `action` enum('view','create','update','delete','move','share','access_granted','access_revoked') NOT NULL,
+  `details` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `ip_address` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_folder_activity_folder` (`folder_id`),
+  KEY `idx_folder_activity_user` (`user_id`),
+  KEY `idx_folder_activity_created_at` (`created_at` DESC),
+  KEY `idx_folder_activity_action` (`action`),
+  CONSTRAINT `fk_folder_activity_folder` FOREIGN KEY (`folder_id`)
+    REFERENCES `folders`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_folder_activity_user` FOREIGN KEY (`user_id`)
+    REFERENCES `users`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Folder Favorites Table
+CREATE TABLE IF NOT EXISTS `folder_favorites` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `folder_id` int NOT NULL,
+  `user_id` int NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_folder_user_favorite` (`folder_id`, `user_id`),
+  KEY `idx_folder_favorites_user` (`user_id`),
+  KEY `idx_folder_favorites_created_at` (`created_at` DESC),
+  CONSTRAINT `fk_folder_fav_folder` FOREIGN KEY (`folder_id`)
+    REFERENCES `folders`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_folder_fav_user` FOREIGN KEY (`user_id`)
+    REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Files Table
@@ -270,59 +334,78 @@ CREATE TABLE IF NOT EXISTS `item_activation_status` (
   KEY `idx_item_activation_updated_at` (`updated_at` DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Notices Table
-CREATE TABLE IF NOT EXISTS `notices` (
-  `id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+-- System Notices Table (Enhanced)
+CREATE TABLE IF NOT EXISTS `system_notices` (
+  `id` int NOT NULL AUTO_INCREMENT,
   `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
-  `text_content` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci,
-  `file_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
-  `file_path` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
-  `file_size` bigint DEFAULT NULL,
-  `mime_type` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
-  `is_active` tinyint(1) DEFAULT '1',
-  `is_dismissible` tinyint(1) DEFAULT '0',
-  `created_by` int DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `content` text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `notice_type` enum('info','warning','error','success','announcement') NOT NULL DEFAULT 'info',
+  `priority` enum('low','medium','high','critical') NOT NULL DEFAULT 'medium',
+  `target_audience` enum('all','logged_in','admin','teachers','students') NOT NULL DEFAULT 'all',
   `expires_at` timestamp NULL DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `created_by` int NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_notices_created_at` (`created_at` DESC),
-  KEY `idx_notices_active` (`is_active`, `created_at` DESC),
-  KEY `idx_notices_dismissible` (`is_dismissible`),
+  KEY `idx_notices_active` (`is_active`),
+  KEY `idx_notices_type` (`notice_type`),
+  KEY `idx_notices_priority` (`priority`),
+  KEY `idx_notices_expires` (`expires_at`),
+  KEY `idx_notices_audience` (`target_audience`),
   KEY `idx_notices_created_by` (`created_by`),
-  KEY `idx_notices_expires_at` (`expires_at`)
+  KEY `idx_notices_created_at` (`created_at` DESC),
+  CONSTRAINT `fk_notices_created_by` FOREIGN KEY (`created_by`)
+    REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Notice Attachments Table
+CREATE TABLE IF NOT EXISTS `notice_attachments` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `notice_id` int NOT NULL,
+  `file_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `file_path` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `file_size` int NOT NULL,
+  `mime_type` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `file_type` enum('pdf','doc','docx','txt','jpg','jpeg','png','gif','mp3','mp4','webm') NOT NULL,
+  `uploaded_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_attachments_notice` (`notice_id`),
+  KEY `idx_attachments_type` (`file_type`),
+  CONSTRAINT `fk_attachments_notice` FOREIGN KEY (`notice_id`)
+    REFERENCES `system_notices` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Notice Views Table
 CREATE TABLE IF NOT EXISTS `notice_views` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `notice_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
-  `user_id` int NOT NULL,
+  `notice_id` int NOT NULL,
+  `user_id` int DEFAULT NULL,
   `viewed_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `ip_address` varchar(45) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `idx_notice_views_unique` (`notice_id`,`user_id`),
-  KEY `idx_notice_views_user` (`user_id`),
-  KEY `idx_notice_views_viewed_at` (`viewed_at` DESC),
-  CONSTRAINT `fk_notice_views_notice` FOREIGN KEY (`notice_id`)
-    REFERENCES `notices`(`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_notice_views_user` FOREIGN KEY (`user_id`)
-    REFERENCES `users`(`id`) ON DELETE CASCADE
+  KEY `idx_views_notice` (`notice_id`),
+  KEY `idx_views_user` (`user_id`),
+  KEY `idx_views_viewed_at` (`viewed_at` DESC),
+  CONSTRAINT `fk_views_notice` FOREIGN KEY (`notice_id`)
+    REFERENCES `system_notices` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_views_user` FOREIGN KEY (`user_id`)
+    REFERENCES `users`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Notice Dismissals Table
 CREATE TABLE IF NOT EXISTS `notice_dismissals` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `notice_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `notice_id` int NOT NULL,
   `user_id` int NOT NULL,
   `dismissed_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `idx_notice_dismissals_unique` (`notice_id`,`user_id`),
-  KEY `idx_notice_dismissals_user` (`user_id`),
-  KEY `idx_notice_dismissals_dismissed_at` (`dismissed_at` DESC),
-  CONSTRAINT `fk_notice_dismissals_notice` FOREIGN KEY (`notice_id`)
-    REFERENCES `notices`(`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_notice_dismissals_user` FOREIGN KEY (`user_id`)
+  UNIQUE KEY `unique_dismissal` (`notice_id`, `user_id`),
+  KEY `idx_dismissals_notice` (`notice_id`),
+  KEY `idx_dismissals_user` (`user_id`),
+  KEY `idx_dismissals_dismissed_at` (`dismissed_at` DESC),
+  CONSTRAINT `fk_dismissals_notice` FOREIGN KEY (`notice_id`)
+    REFERENCES `system_notices` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_dismissals_user` FOREIGN KEY (`user_id`)
     REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
