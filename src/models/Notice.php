@@ -115,11 +115,12 @@ class Notice
                 $types .= 'i';
             }
 
-            // Add target audience filtering
+            // Add target audience filtering (FIXED: Proper parameter binding)
             if (isset($filters['target_audience']) && !empty($filters['target_audience'])) {
-                $conditions[] = 'n.target_audience IN (\'all\', ?)';
+                $conditions[] = '(n.target_audience = ? OR n.target_audience = ?)';
+                $params[] = 'all';
                 $params[] = $filters['target_audience'];
-                $types .= 's';
+                $types .= 'ss';
             }
 
             // Add expiration filtering

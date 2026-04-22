@@ -262,7 +262,7 @@ class AdminDashboard
     public static function getUserActivityStats(?string $timeframe = null): array
     {
         try {
-            $timeCondition = self::getTimeCondition($timeframe);
+            $timeValue = self::getTimeConditionValue($timeframe);
 
             $query = "SELECT
                        action,
@@ -270,21 +270,25 @@ class AdminDashboard
                        COUNT(DISTINCT user_id) as unique_users,
                        COUNT(DISTINCT DATE(created_at)) as active_days
                        FROM system_activity
-                       WHERE created_at >= {$timeCondition}
+                       WHERE created_at >= ?
                        GROUP BY action
                        ORDER BY count DESC";
 
-            $result = \EMA\Config\Database::query($query);
+            $stmt = \EMA\Config\Database::prepare($query);
+            $stmt->bind_param('s', $timeValue);
+            $stmt->execute();
+            $result = $stmt->get_result();
             $activities = [];
 
             while ($row = $result->fetch_assoc()) {
                 $activities[] = $row;
             }
+            $stmt->close();
 
             // Get peak activity hours
-            $peakHours = self::getPeakActivityHours($timeCondition);
+            $peakHours = self::getPeakActivityHours($timeValue);
             // Get user growth trends
-            $growthTrends = self::getUserGrowthTrends($timeCondition);
+            $growthTrends = self::getUserGrowthTrends($timeValue);
 
             return [
                 'activities' => $activities,
@@ -381,9 +385,11 @@ class AdminDashboard
             // Get total count
             $countQuery = "SELECT COUNT(*) as total FROM audit_log al {$whereClause}";
             $stmt = \EMA\Config\Database::prepare($countQuery);
-            foreach ($params as $index => $param) {
-                $stmt->bind_param(is_int($param) ? 'i' : 's', $param);
+            $types = '';
+            foreach ($params as $param) {
+                $types .= is_int($param) ? 'i' : 's';
             }
+            $stmt->bind_param($types, ...$params);
             $stmt->execute();
             $total = $stmt->get_result()->fetch_assoc()['total'];
             $stmt->close();
@@ -401,7 +407,7 @@ class AdminDashboard
                       LIMIT ? OFFSET ?";
 
             $stmt = \EMA\Config\Database::prepare($query);
-            $paramTypes = str_repeat(is_int($params[0] ?? '') ? 'i' : 's', count($params)) . 'ii';
+            $paramTypes = $types . 'ii';
             $allParams = array_merge($params, [$perPage, $offset]);
             $stmt->bind_param($paramTypes, ...$allParams);
             $stmt->execute();
@@ -496,72 +502,80 @@ class AdminDashboard
     }
 
     /**
-     * Get time condition for SQL queries
+     * Get time condition value for parameter binding
      * @param string|null $timeframe Timeframe ('day', 'week', 'month', 'all')
-     * @return string SQL time condition
+     * @return string Time condition value for prepared statement
      */
-    private static function getTimeCondition(?string $timeframe): string
+    private static function getTimeConditionValue(?string $timeframe): string
     {
         switch ($timeframe) {
             case 'day':
-                return "DATE_SUB(NOW(), INTERVAL 1 DAY)";
+                return DATE_SUB(NOW(), INTERVAL 1 DAY);
             case 'week':
-                return "DATE_SUB(NOW(), INTERVAL 7 DAY)";
+                return DATE_SUB(NOW(), INTERVAL 7 DAY);
             case 'month':
-                return "DATE_SUB(NOW(), INTERVAL 30 DAY)";
+                return DATE_SUB(NOW(), INTERVAL 30 DAY);
             case 'all':
             default:
-                return "'1970-01-01'";
+                return '1970-01-01';
         }
     }
 
     /**
      * Get peak activity hours
-     * @param string $timeCondition Time condition for query
+     * @param string $timeValue Time value for WHERE clause
      * @return array Peak activity hours data
      */
-    private static function getPeakActivityHours(string $timeCondition): array
+    private static function getPeakActivityHours(string $timeValue): array
     {
         $query = "SELECT
                    HOUR(created_at) as hour,
                    COUNT(*) as count
                    FROM system_activity
-                   WHERE created_at >= {$timeCondition}
+                   WHERE created_at >= ?
                    GROUP BY HOUR(created_at)
                    ORDER BY count DESC
                    LIMIT 5";
 
-        $result = \EMA\Config\Database::query($query);
+        $stmt = \EMA\Config\Database::prepare($query);
+        $stmt->bind_param('s', $timeValue);
+        $stmt->execute();
+        $result = $stmt->get_result();
         $peakHours = [];
 
         while ($row = $result->fetch_assoc()) {
             $peakHours[] = $row;
         }
+        $stmt->close();
 
         return $peakHours;
     }
 
     /**
      * Get user growth trends
-     * @param string $timeCondition Time condition for query
+     * @param string $timeValue Time value for WHERE clause
      * @return array User growth trends
      */
-    private static function getUserGrowthTrends(string $timeCondition): array
+    private static function getUserGrowthTrends(string $timeValue): array
     {
         $query = "SELECT
                    DATE(created_at) as date,
                    COUNT(*) as new_users
                    FROM users
-                   WHERE created_at >= {$timeCondition}
+                   WHERE created_at >= ?
                    GROUP BY DATE(created_at)
                    ORDER BY date ASC";
 
-        $result = \EMA\Config\Database::query($query);
+        $stmt = \EMA\Config\Database::prepare($query);
+        $stmt->bind_param('s', $timeValue);
+        $stmt->execute();
+        $result = $stmt->get_result();
         $trends = [];
 
         while ($row = $result->fetch_assoc()) {
             $trends[] = $row;
         }
+        $stmt->close();
 
         return $trends;
     }

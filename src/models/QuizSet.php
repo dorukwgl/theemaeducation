@@ -499,6 +499,132 @@ class QuizSet
     }
 
     /**
+     * Get all quiz sets with filtering and pagination
+     * @param int $page Page number
+     * @param int $perPage Items per page
+     * @param int|null $folderId Filter by folder ID
+     * @param int|null $userId User ID for access filtering
+     * @param bool $includeQuestionCount Include question counts
+     * @param bool $publishedOnly Only published quiz sets
+     * @return array Quiz sets
+     */
+    public static function getAllQuizSets(
+        int $page,
+        int $perPage,
+        ?int $folderId = null,
+        ?int $userId = null,
+        bool $includeQuestionCount = false,
+        bool $publishedOnly = true
+    ): array {
+        try {
+            $conditions = [];
+            $params = [];
+            $types = '';
+
+            // Add folder filter
+            if ($folderId !== null) {
+                $conditions[] = 'qs.folder_id = ?';
+                $params[] = $folderId;
+                $types .= 'i';
+            }
+
+            // Add published filter
+            if ($publishedOnly) {
+                $conditions[] = 'qs.is_published = 1';
+            }
+
+            // Build WHERE clause
+            $whereClause = !empty($conditions) ? 'WHERE ' . implode(' AND ', $conditions) : '';
+
+            // Get quiz sets with pagination
+            $offset = ($page - 1) * $perPage;
+            $query = "
+                SELECT qs.*,
+                       fl.name as folder_name,
+                       fl.icon_path as folder_icon_path";
+
+            if ($includeQuestionCount) {
+                $query .= ",
+                       (SELECT COUNT(*) FROM questions WHERE quiz_set_id = qs.id) as question_count";
+            }
+
+            $query .= "
+                FROM quiz_sets qs
+                LEFT JOIN folders fl ON qs.folder_id = fl.id
+                {$whereClause}
+                ORDER BY qs.created_at DESC
+                LIMIT ? OFFSET ?";
+
+            $types .= 'ii';
+            $params[] = $perPage;
+            $params[] = $offset;
+
+            $stmt = \EMA\Config\Database::prepare($query);
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            $quizSets = [];
+            while ($row = $result->fetch_assoc()) {
+                $quizSetData = [
+                    'id' => (int) $row['id'],
+                    'folder_id' => (int) $row['folder_id'],
+                    'name' => $row['name'],
+                    'description' => $row['description'],
+                    'icon_path' => $row['icon_path'],
+                    'access_type' => $row['access_type'],
+                    'question_count' => $includeQuestionCount ? (int) $row['question_count'] : null,
+                    'total_questions' => (int) $row['total_questions'],
+                    'duration_minutes' => (int) $row['duration_minutes'],
+                    'passing_score' => (int) $row['passing_score'],
+                    'is_published' => (bool) $row['is_published'],
+                    'created_by' => $row['created_by'],
+                    'created_at' => $row['created_at'],
+                    'updated_at' => $row['updated_at'],
+                    'folder_name' => $row['folder_name'],
+                    'folder_icon_path' => $row['folder_icon_path']
+                ];
+                $quizSets[] = $quizSetData;
+            }
+
+            $stmt->close();
+
+            // Get total count for pagination
+            $countQuery = "SELECT COUNT(*) as total FROM quiz_sets qs {$whereClause}";
+            $countStmt = \EMA\Config\Database::prepare($countQuery);
+            $countTypes = substr($types, 0, strlen($types) - 2);
+            $countParams = array_slice($params, 0, count($params) - 2);
+            $countStmt->bind_param($countTypes, ...$countParams);
+            $countStmt->execute();
+            $total = $countStmt->get_result()->fetch_assoc()['total'];
+            $countStmt->close();
+
+            // Filter by user access if userId provided
+            if ($userId !== null) {
+                $quizSets = array_filter($quizSets, function($quizSet) use ($userId) {
+                    return self::checkQuizSetAccess($userId, $quizSet['id']);
+                });
+            }
+
+            Logger::info('Quiz sets retrieved successfully', [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'count' => count($quizSets)
+            ]);
+
+            return $quizSets;
+        } catch (\Exception $e) {
+            Logger::error('Error retrieving quiz sets', [
+                'error' => $e->getMessage(),
+                'page' => $page,
+                'per_page' => $perPage
+            ]);
+            return [];
+        }
+    }
+
+    /**
      * Get quiz set statistics
      * @param int $quizSetId Quiz set ID
      * @return array Quiz set statistics

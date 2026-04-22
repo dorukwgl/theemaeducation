@@ -1,1087 +1,223 @@
-# CLAUDE.md
+# EMA Education Platform - Development Guide
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+**Claude Code Development Guide for this repository.**
 
 ## Project Overview
 
-EMA Education Platform is a comprehensive web-based educational management system providing quiz/exam management, file distribution, user access control, and mobile app integration. The project is currently being refactored from legacy PHP files to a modern, structured architecture using PHP 8.0+ with PSR-4 autoloading.
-
-## Implementation Progress
-
-**Phase 1: Infrastructure & Foundation (Security)** (Week 1) - ✅ **COMPLETED**
-
-### ✅ Completed Components (April 20, 2026)
-- **1.1 Project Structure Setup**: All directories created with proper PSR-4 namespace structure
-- **1.2 Core Configuration System**: Environment-based config with dotenv, centralized settings management
-- **1.3 Database Layer**: Connection pooling, prepared statements, transaction management
-- **1.4 Security Framework**: Complete security implementation including:
-  - `src/utils/Logger.php` - Monolog-based logging with rotation and sensitive data filtering
-  - `src/utils/Security.php` - CSRF, password hashing, input sanitization, XSS protection
-  - `src/utils/Validator.php` - Comprehensive validation framework with 20+ rule types
-  - `src/middleware/CorsMiddleware.php` - Configurable CORS handling
-  - `src/middleware/RateLimitMiddleware.php` - Per-IP and per-user rate limiting
-  - `src/middleware/AuthMiddleware.php` - Session-based authentication with role checking
-  - `src/middleware/ValidationMiddleware.php` - Automatic input validation
-
-### 🔄 Phase 2: Core Systems (Week 2) - ✅ **COMPLETED**
-- 2.1 Authentication System - ✅ **COMPLETED**
-- 2.2 User Management - ✅ **COMPLETED**
-- 2.3 Access Control System - ✅ **COMPLETED**
-- 2.4 File Management - ✅ **COMPLETED**
-
-#### ✅ Phase 3.2: Quiz Management System (April 21, 2026)
-Complete quiz management system implementation with API optimization and embedded access control:
-
-**Database Schema (Created):**
-- Enhanced `quiz_sets` table with description, question_count, duration_minutes, passing_score, is_published, created_by columns
-- `quiz_activity` table for comprehensive activity tracking
-- `quiz_attempts` table for user quiz attempts with attempt numbering
-- `quiz_results` table for detailed question-by-question results
-
-**Models Created:**
-- `src/models/QuizSet.php` - Quiz set data operations with access control integration
-- `src/models/Question.php` - Question data operations with multimedia support, batch operations
-
-**Services Created:**
-- `src/services/QuizService.php` - Quiz business logic including:
-  - Quiz set data validation
-  - Question data validation
-  - Random quiz generation from question bank
-  - Score calculation with detailed breakdown
-  - Quiz analytics with time-based reporting
-  - File upload validation (icons, questions, choices)
-  - Word formatting JSON validation
-
-**Controllers Created:**
-- `src/controllers/QuizController.php` - Quiz management endpoints with 13 optimized endpoints:
-  - `GET /api/quiz-sets` - List quiz sets with pagination
-  - `GET /api/quiz-sets/{id}` - Get quiz set details with optional questions/stats
-  - `POST /api/quiz-sets` - Create quiz set (admin only)
-  - `PUT /api/quiz-sets/{id}` - Update quiz set (admin only)
-  - `DELETE /api/quiz-sets/{id}` - Delete quiz set (admin only)
-  - `GET /api/quiz-sets/{id}/questions` - Get quiz set questions
-  - `POST /api/quiz-sets/{id}/questions` - Create question (admin only)
-  - `PUT /api/quiz-sets/{id}/questions/{question_id}` - Update question (admin only)
-  - `DELETE /api/quiz-sets/{id}/questions/{question_id}` - Delete question (admin only)
-  - `POST /api/quiz-sets/{id}/start` - Start quiz attempt
-  - `POST /api/quiz-ets/{id}/submit` - Submit quiz answers
-  - `GET /api/quiz-sets/{id}/statistics` - Get quiz statistics (admin/owner)
-  - `POST /api/quiz-sets/batch-check` - Batch quiz set access check
-
-**Features Implemented:**
-- Complete quiz set CRUD operations with folder integration
-- Question management with multimedia file uploads (questions and choices A-D)
-- Word formatting support for rich text (bold, underline, italic)
-- Random quiz generation from question banks
-- Comprehensive quiz taking flow (start, submit, calculate score)
-- Detailed quiz analytics with time-based reporting (day, week, month, all)
-- Quiz attempt tracking with attempt numbering and completion status
-- Question-by-question results tracking
-- Quiz set statistics with access distribution and performance metrics
-- Batch operations for efficient processing
-- Embedded access control in all endpoints
-- Query parameter optimization for conditional data inclusion
-- Multimedia file validation with security (size limits, MIME types, extensions)
-- Question backup functionality before deletion
-- Comprehensive error handling and security logging
-- CSRF protection on all state-changing operations
-- Admin-only endpoint enforcement for management operations
-
-**API Optimization:**
-- 99% reduction in API calls for quiz operations (200+ → 2 calls for 100-question quiz)
-- Embedded access control eliminates race conditions
-- Query parameter optimization (`?include_questions=true`, `?include_stats=true`)
-- Batch operations for efficient processing (max 50 items per batch)
-- Single optimized API call for complete quiz taking flow
-
-**Security Features:**
-- Admin-only quiz set and question management
-- Quiz set access control (public, logged-in, private, individual permissions)
-- File upload security (size limits, MIME validation, extension whitelisting)
-- CSRF token protection on all state-changing operations
-- Comprehensive security logging for all operations
-- IP address tracking for quiz attempts
-- User ownership verification for statistics access
-
-**Performance Achievements:**
-- Quiz set loading: 100 questions reduced from ~200 API calls to ~2 API calls (99% improvement)
-- Database query reduction: 90%+ through batch operations
-- Server load reduction: 80%+ through embedded access control
-- Real-time quiz taking with optimized endpoints
-- Efficient question loading with query parameter filtering
-
-### 🔄 Phase 3: Content Management (Week 3) - ✅ **COMPLETED**
-- ✅ **Phase 3.0: API Optimization** (COMPLETED April 21, 2026)
-  - ✅ SystemController implementation with full management features
-  - ✅ Missing authentication routes (forgot-password, reset-password, change-password, me)
-  - ✅ FileController optimized with embedded access control
-  - ✅ FolderController optimized with embedded access control and query parameters
-  - ✅ Batch access check endpoint for multiple items
-  - ✅ Admin endpoint consolidation (removed redundant routes)
-  - ✅ Redundant access check endpoints removed (check, increment)
-  - ✅ API call reduction: Quiz sets with 100+ files now need 50% fewer API calls
-
-#### ✅ Phase 3.0: API Optimization (April 21, 2026)
-Complete API optimization implementation with 99% API call reduction for quiz operations:
-
-**Performance Improvements:**
-- Quiz set loading: 100 questions reduced from ~200 API calls to ~2 API calls (99% improvement)
-- Embedded access control eliminates race conditions
-- Database query reduction: 90%+
-- Server load reduction: 80%+
-
-- 📋 **Phase 3.1: Folder System** (COMPLETED)
-  - Enhanced folder hierarchy and access control
-  - Advanced folder search and statistics
-  - Folder favorites and recent access
-
-- ✅ **Phase 3.2: Quiz Management System** (COMPLETED April 21, 2026)
-  - Comprehensive quiz set management
-  - Question bank with multimedia support
-  - Quiz taking flow with real-time optimization
-  - Statistics and analytics
-  - Word formatting support
-  - 99% API call reduction for quiz operations
-
-**Planned Phase 3.2 Components:**
-- `QuizSet` model for quiz set operations
-- `Question` model for question management
-- `QuizService` for business logic and validation
-- `QuizController` with optimized endpoints
-- Database schema enhancements (quiz_activity, quiz_attempts, quiz_results)
-- API optimization: 99% reduction in API calls for quiz operations
-
-- 3.3 Notice System
-- 3.4 Admin Features
-
-#### ✅ Phase 2.1: Authentication System (April 20, 2026)
-Complete session-based authentication implementation:
-
-**Models Created:**
-- `src/models/User.php` - User model with CRUD operations, password verification, email/phone existence checks
-
-**Services Created:**
-- `src/services/AuthService.php` - Authentication business logic including:
-  - Login with attempt tracking and IP lockout (5 failed attempts = 15 min lockout)
-  - User registration with validation
-  - Logout with session cleanup
-  - Password reset flow (request + completion)
-  - Password change for authenticated users
-  - Session timeout handling (2 days inactivity)
-  - Login attempt tracking with file-based storage in `storage/login_attempts/`
-
-**Controllers Created:**
-- `src/controllers/AuthController.php` - HTTP endpoints for all authentication operations
-
-**Updated Components:**
-- `src/middleware/AuthMiddleware.php` - Session timeout updated to 2 days (172800 seconds)
-
-**Features Implemented:**
-- Secure password hashing (bcrypt cost 12)
-- Session-based authentication with 2-day inactivity timeout
-- Login attempt tracking with IP lockout
-- Complete password reset flow
-- Comprehensive input validation and rate limiting
-- Full security logging
-
-**API Endpoints:**
-- `POST /api/auth/login` - User login (20 attempts/30min per IP)
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/logout` - User logout
-- `POST /api/auth/forgot-password` - Request password reset (10 requests/hour)
-- `POST /api/auth/reset-password` - Complete password reset (15 attempts/hour)
-- `POST /api/auth/change-password` - Change password (authenticated)
-- `GET /api/auth/me` - Get current user info
-- `GET /api/auth/me` - Get current user info
-
-#### ✅ Phase 2.2: User Management (April 20, 2026)
-Complete user management system implementation:
-
-**Models Extended:**
-- `src/models/User.php` - Extended with user management methods:
-  - `getAllUsers()` - User listing with pagination, search, role filtering, sorting
-  - `deleteUserCascade()` - User deletion with cascade cleanup
-  - `getAllAdmins()` - Admin user listing
-  - `grantAdmin()` - Grant admin privileges
-  - `revokeAdmin()` - Revoke admin privileges
-  - `isAdmin()` - Check admin status
-  - `getUserStats()` - User statistics for dashboard
-
-**Controllers Created:**
-- `src/controllers/UserController.php` - User management endpoints:
-  - `index()` - List users with pagination (admin only)
-  - `show()` - Get user profile (admin or own)
-  - `update()` - Update user profile (admin or own)
-  - `delete()` - Delete user with cascade (admin only)
-
-- `src/controllers/AdminController.php` - Admin operations:
-  - `index()` - List admin users (admin only)
-  - `grant()` - Grant admin privileges (admin only)
-  - `list()` - Alternative admin listing (admin only)
-  - `approveReset()` - Approve password reset requests (admin only)
-
-**Features Implemented:**
-- User listing with pagination and search
-- Profile management with role-based permissions
-- Admin privilege management
-- Cascade deletion for user accounts
-- Password reset approval workflow
-- Comprehensive security logging
-
-**API Endpoints:**
-- `GET /api/users` - List users with pagination and role filtering (admin only) ✨ **ENHANCED**
-- `GET /api/users/{id}` - Get user profile
-- `PUT /api/users/{id}` - Update user profile
-- `DELETE /api/users/{id}` - Delete user account
-- `POST /api/admin/grant` - Grant admin privileges (admin only)
-- `POST /api/admin/approve-reset` - Approve password reset requests (admin only)
-
-**Optimization Changes (Phase 3.0):**
-- ✅ Removed `GET /api/admins` - Use `GET /api/users?role=admin` instead
-- ✅ Removed `GET /api/admin/list` - Use `GET /api/users?role=admin` instead
-
-#### ✅ Phase 2.3: Access Control System (April 20, 2026)
-Complete access control system implementation:
-
-**Models Created:**
-- `src/models/Access.php` - Access control database operations:
-  - `checkAccess()` - Check if user has access to item
-  - `grantAccess()` - Grant user access to item
-  - `revokeAccess()` - Revoke user access from item
-  - `incrementAccess()` - Increment access count with limit enforcement
-  - `getPermissions()` - Get user permissions with filters
-  - `grantAccessToAllUsers()` - Grant/revoke public access
-  - `grantAccessToLoggedInUsers()` - Grant/revoke logged-in access
-  - `getAllUsersAccess()` - List public access items
-  - `getLoggedInUsersAccess()` - List logged-in access items
-  - `getAccessStats()` - Get access statistics
-
-**Services Created:**
-- `src/services/AccessService.php` - Access control business logic:
-  - `validateAccessRequest()` - Validate access requests
-  - `checkAccess()` - Check access with caching layer
-  - `grantAccessWithValidation()` - Grant access with validation
-  - `revokeAccessWithValidation()` - Revoke access with validation
-  - `incrementAccessWithCheck()` - Increment access with limit check
-  - `bulkGrantAccess()` - Bulk grant access to multiple users
-  - `getAccessReport()` - Generate detailed access reports
-  - `cleanupExpiredAccess()` - Cleanup expired/inactive permissions
-
-**Controllers Created:**
-- `src/controllers/AccessController.php` - Access control endpoints:
-  - `check()` - Check access permissions (authenticated users)
-  - `increment()` - Increment access count (authenticated users)
-  - `grant()` - Grant/revoke user access (admin only)
-  - `permissions()` - List permissions (admin only)
-  - `grantAllUsers()` - Grant/revoke public access (admin only)
-  - `allUsers()` - List public access items (admin only)
-  - `grantLoginUsers()` - Grant/revoke logged-in access (admin only)
-  - `loginUsers()` - List logged-in access items (admin only)
-
-**Features Implemented:**
-- User access checking (admin bypass, public access, individual permissions)
-- Access counting and limit enforcement
-- Public access management (all users)
-- Logged-in access management (authenticated users)
-- Bulk access operations
-- Access statistics and reporting
-- Comprehensive security logging
-- Admin-only access control enforcement
-
-**API Endpoints:**
-- `POST /api/access/batch-check` - Batch access check for multiple items (authenticated users) ✨ **NEW**
-- `POST /api/access/grant` - Grant/revoke user access (admin only)
-- `GET /api/access/permissions` - List permissions (admin only)
-- `POST /api/access/all-users` - Grant/revoke public access (admin only)
-- `GET /api/access/all-users` - List public access items (admin only)
-- `POST /api/access/login-users` - Grant/revoke logged-in access (admin only)
-- `GET /api/access/login-users` - List logged-in access items (admin only)
-
-**Optimization Changes (Phase 3.0):**
-- ✅ Removed `POST /api/access/check` - Access checks now embedded in data retrieval
-- ✅ Removed `POST /api/access/increment` - Access counting embedded in download endpoint
-- ✅ Added `POST /api/access/batch-check` - Efficient batch access validation for UI
-
-#### ✅ Phase 2.4: File Management System (April 20, 2026)
-Complete file and folder management system implementation:
-
-**Models Created:**
-- `src/models/Folder.php` - Folder model with CRUD operations:
-  - `getAllFolders()` - List all folders with file counts
-  - `findById()` - Find folder by ID
-  - `create()` - Create new folder with icon upload
-  - `update()` - Update folder with icon replacement
-  - `delete()` - Delete folder with cascade cleanup
-  - `getFolderContents()` - Get files in folder
-
-- `src/models/File.php` - File model with access control integration:
-  - `findById()` - Find file by ID with folder details
-  - `create()` - Create file record
-  - `update()` - Update file metadata
-  - `delete()` - Delete file with cascade cleanup
-  - `checkFileAccess()` - Check file access with Access model integration
-  - `getFileStats()` - Get file access statistics
-  - `getFilesByFolder()` - Get files by folder with user filtering
-
-**Controllers Created:**
-- `src/controllers/FolderController.php` - Folder management endpoints:
-  - `index()` - List all folders (authenticated users)
-  - `store()` - Create new folder (admin only)
-  - `show()` - Get folder details (authenticated users)
-  - `update()` - Update folder (admin only)
-  - `delete()` - Delete folder (admin only)
-  - `contents()` - Get folder contents (authenticated users)
-
-- `src/controllers/FileController.php` - File management endpoints:
-  - `upload()` - Upload file with security validation (admin only)
-  - `show()` - Get file details with access info (authenticated users)
-  - `delete()` - Delete file (admin only)
-  - `download()` - Download file with access tracking (authenticated users)
-
-**Features Implemented:**
-- Folder CRUD operations with icon management
-- File upload with comprehensive security (MIME type, size, extension validation)
-- File download with access control and tracking
-- Secure filename generation and file storage
-- Cascade deletion (files, icons, access permissions)
-- Access control integration for all file operations
-- Public and logged-in access types support
-- Individual user permissions via Access model
-- Admin bypass for all operations
-- CSRF protection on all state-changing operations
-- Comprehensive security logging
-- File path validation (directory traversal prevention)
-- Proper HTTP headers for downloads
-
-**File Upload Security:**
-- Multi-layer validation (MIME type, extension, size)
-- Server-side MIME type validation (not just extension)
-- File extension whitelisting (images, documents, audio, video)
-- File size limit enforcement (10MB default)
-- Secure filename generation (timestamp + random string)
-- Directory traversal prevention
-- Proper file permissions (0644)
-- File content scanning framework
-
-**Access Control Integration:**
-- Public access ('all') - No authentication required
-- Logged-in access ('logged_in') - Requires authentication
-- Individual user permissions - Via Access model integration
-- Access counting and limit enforcement
-- Admin bypass for all operations
-- Access tracking on downloads
-
-**API Endpoints:**
-- `GET /api/folders` - List all folders (authenticated users)
-- `POST /api/folders` - Create new folder (admin only)
-- `GET /api/folders/{id}` - Get folder details with optional contents (authenticated users) ✨ **ENHANCED**
-- `PUT /api/folders/{id}` - Update folder (admin only)
-- `DELETE /api/folders/{id}` - Delete folder (admin only)
-- `POST /api/files/upload` - Upload file (admin only)
-- `GET /api/files/{id}` - Get file details with embedded access control (authenticated users) ✨ **ENHANCED**
-- `DELETE /api/files/{id}` - Delete file (admin only)
-- `GET /api/files/{id}/download` - Download file with embedded access control and counting (authenticated users) ✨ **ENHANCED**
-
-**Optimization Changes (Phase 3.0):**
-- ✅ Removed `GET /api/folders/{id}/contents` - Use `GET /api/folders/{id}?include_contents=true` instead
-- ✅ Enhanced `GET /api/folders/{id}` - Added `include_contents` query parameter and embedded access information
-- ✅ Enhanced `GET /api/files/{id}` - Added embedded access information in response
-- ✅ Enhanced `GET /api/files/{id}/download` - Embedded access check and counter increment in single operation
-
-### 📋 Phase 3: Content Management (Week 3)
-- 3.1 Folder System
-- 3.2 Quiz System ✅ **COMPLETED** (April 21, 2026)
-- 3.3 Notice System
-- 3.4 Admin Features ✅ **COMPLETED** (April 21, 2026)
-
-#### ✅ Phase 3.4: Admin Features (April 21, 2026)
-Complete admin dashboard and monitoring system implementation with comprehensive analytics:
-
-**Database Schema (Created):**
-- `system_activity` table for comprehensive activity tracking across all user and system actions
-- `system_health` table for real-time health monitoring (database, disk, memory, CPU, API performance, error rates)
-- `audit_log` table for comprehensive admin action auditing with change tracking
-- `bulk_operations` table for efficient bulk operation management with progress tracking
-
-**Models Created:**
-- `src/models/AdminDashboard.php` - Admin dashboard data operations with:
-  - System overview (users, files, quizzes, health status)
-  - User activity statistics with time-based filtering
-  - System health monitoring with historical data
-  - Audit log with search and pagination
-  - Bulk operation status tracking
-
-**Services Created:**
-- `src/services/SystemMonitoringService.php` - System monitoring and bulk operations:
-  - Comprehensive health checks (database, disk, memory, CPU, API performance, error rates)
-  - System metric recording with automatic status determination
-  - Bulk operation creation and processing with chunked execution
-  - System analytics with user engagement, content performance, and security events
-  - Real-time monitoring with actionable recommendations
-
-**Controllers Enhanced:**
-- `src/controllers/AdminController.php` - Enhanced with 10 new admin endpoints:
-  - `GET /api/admin/dashboard` - Comprehensive admin dashboard (admin only)
-  - `GET /api/admin/user-activity` - User activity statistics (admin only)
-  - `GET /api/admin/system-health` - System health monitoring (admin only)
-  - `GET /api/admin/audit-log` - Audit log with filters (admin only)
-  - `POST /api/admin/bulk-operations` - Create bulk operations (admin only)
-  - `GET /api/admin/bulk-operations/{id}` - Get bulk operation status (admin only)
-  - `DELETE /api/admin/bulk-operations/{id}` - Cancel bulk operations (admin only)
-  - `GET /api/admin/analytics` - System analytics (admin only)
-  - `POST /api/admin/health-check` - Run comprehensive health check (admin only)
-  - `DELETE /api/admin/audit-log` - Clear audit log (admin only)
-
-**Features Implemented:**
-- Comprehensive admin dashboard with system overview and health alerts
-- Real-time system health monitoring (database, disk, memory, CPU, API performance, error rates)
-- User activity tracking with time-based analysis (day, week, month, all)
-- Audit log with advanced filtering (user, action, entity type) and pagination
-- Bulk operations with progress tracking (delete, update, access control, publish, archive)
-- System analytics with user engagement, content performance, and security events
-- Charts data generation for visualizations (daily activity, user growth trends)
-- Actionable insights and health recommendations
-- Background processing for long-running bulk operations
-- Comprehensive security logging and audit trails
-- Admin-only endpoint enforcement for all new features
-
-**Performance Optimizations:**
-- Dashboard data caching (5-minute TTL)
-- System health caching (2-minute TTL)
-- User activity statistics caching (10-minute TTL)
-- Analytics results caching (15-minute TTL)
-- Chunked bulk operations (10-20 items per chunk)
-- Database indexes for audit log and system activity queries
-- Efficient health monitoring with minimal performance impact
-
-**Security Features:**
-- Admin-only access to all new endpoints
-- CSRF token protection on state-changing operations
-- Comprehensive audit logging with IP addresses and user agents
-- Bulk operation confirmation and validation
-- Audit log tamper protection with secure deletion policies
-- Rate limiting for admin operations
-- Security event monitoring and alerting
-
-**Monitoring & Analytics:**
-- Real-time health monitoring with status determination (healthy/warning/critical)
-- Peak activity hours analysis
-- User growth trends tracking
-- Engagement rate calculations
-- Content performance metrics (file downloads, quiz completion rates)
-- API performance monitoring (response times, query times)
-- Error rate tracking and analysis
-- System health scoring (0-100) with actionable recommendations
-
-**Bulk Operations:**
-- Support for multiple operation types (delete, update, access control, publish, archive)
-- Support for multiple target types (users, files, folders, quiz_sets, notices)
-- Progress tracking with real-time updates
-- Error handling and detailed error reporting
-- Cancellation support for pending/processing operations
-- Maximum 1000 items per operation for system stability
-- Chunked processing for efficient execution
-
-**Audit & Compliance:**
-- Comprehensive audit log with old/new value tracking
-- Advanced filtering capabilities (user, action, entity type, time range)
-- Paginated results (up to 100 items per page)
-- Secure audit log cleanup with minimum 30-day retention
-- Audit log search and export capabilities
-- Comprehensive admin action tracking
-
-### 📋 Phase 4: API Implementation (Week 4)
-- 4.1 API Contract Preservation
-- Legacy route compatibility
-
-### 📋 Phase 5: Performance Optimization (Week 5)
-- 5.1 Database Optimization
-- 5.2 Caching Strategy
-- 5.3 Resource Optimization
-- 5.4 cPanel-Specific Optimizations
-
-### 📋 Phase 6: Testing & Deployment (Week 6)
-- 6.1 Testing
-- 6.2 Deployment
-- 6.3 Documentation
+EMA Education Platform is a comprehensive web-based educational management system providing quiz/exam management, file distribution, user access control, and mobile app integration. The project uses PHP 8.0+ with PSR-4 autoloading on a custom lightweight framework.
+
+## Current Status
+
+**Completed Phases:**
+- ✅ Phase 1: Infrastructure & Foundation (Security)
+- ✅ Phase 2: Core Systems (Authentication, User Management, Access Control, File Management)
+- ✅ Phase 3: Content Management (API Optimization, Quiz System, Notice System, Admin Features)
+- ⏳ Phase 4-6: Future phases
 
 ## Architecture
 
-### Core Framework Components
+**Framework Components:**
+- **Router** (`src/core/Router.php`): Route matching, parameter extraction, middleware execution
+- **Request** (`src/core/Request.php`): Unified access to query parameters, POST data, JSON, files
+- **Response** (`src/core/Response.php`): JSON responses, file downloads, HTTP status codes
 
-The application uses a custom lightweight framework built around these core components:
+**Configuration:**
+- **Config** (`src/config/config.php`): Environment variables, dot-notation config access
+- **Database** (`src/config/database.php`): mysqli connection factory, prepared statements, transactions
+- **Constants** (`src/config/constants.php`): HTTP codes, user roles, access types, table names
 
-- **Router** (`src/core/Router.php`): Handles route matching, parameter extraction, and middleware execution. Supports named routes and HTTP method-specific routing (GET, POST, PUT, DELETE, OPTIONS).
-- **Request** (`src/core/Request.php`): Provides unified access to request data from query parameters, POST data, JSON body, and files. Includes IP sanitization, CSRF token validation, and header parsing.
-- **Response** (`src/core/Response.php`): Handles HTTP responses with JSON formatting, file downloads, streaming, CORS headers, and various HTTP status codes.
+**Middleware:**
+- **AuthMiddleware**: Session-based authentication, role checking, user context
+- **CorsMiddleware**: Configurable CORS handling
+- **RateLimitMiddleware**: Per-IP and per-user rate limiting
+- **ValidationMiddleware**: Automatic input validation
 
-### Configuration System
+## Key Patterns
 
-Configuration is managed through environment variables and a central Config class:
+### Authentication & Authorization
+- Session-based authentication with 2-day inactivity timeout
+- Admin-only endpoints use `new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])`
+- Regular auth endpoints use `AuthMiddleware::class`
+- Always validate CSRF tokens on state-changing operations
 
-- **Config** (`src/config/config.php`): Loads environment variables using `vlucas/phpdotenv`, provides dot-notation access to nested config values. Includes app, database, security, CORS, rate limiting, upload, logging, cache, and session configurations.
-- **Database** (`src/config/database.php`): Singleton connection manager using mysqli. Supports prepared statements, transactions, and connection pooling. Includes connection tracking and error logging.
-- **Constants** (`src/config/constants.php`): Centralized constants for HTTP status codes, user roles, access types, database table names, file paths, error messages, and other application-wide values.
+### Database Operations
+- Use `Database::prepare()` for all queries to prevent SQL injection
+- Use `Database::query()` for simple queries without parameters
+- Always use parameter binding: `$stmt->bind_param()`
+- Use transactions for multi-step operations: `Database::beginTransaction()`, `commit()`, `rollback()`
 
-### Directory Structure
+### Error Handling
+- Use `try-catch` blocks for database and file operations
+- Log errors with `Logger::error()` including context
+- Use appropriate HTTP status codes: 200, 201, 400, 401, 403, 404, 422, 500
+- Return consistent response format via `Response` methods
+
+### Security Best Practices
+- **Input Validation**: Always validate user input with `Validator::make()`
+- **CSRF Protection**: Generate and verify tokens via `Security::generateCsrfToken()`, `verifyCsrfToken()`
+- **Password Security**: Use `Security::hashPassword()`, `verifyPassword()`
+- **Input Sanitization**: Use `Security` class for email, phone, etc.
+- **Logging**: Use `Logger::securityEvent()` for security-relevant actions
+- **File Uploads**: Validate MIME types, sizes, extensions; use secure filename generation
+
+## Response Format
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "message": "Human-readable message",
+  "data": { }
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "message": "Error message",
+  "errors": []
+}
+```
+
+**Validation Error:**
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "errors": {
+    "field": "Error message"
+  }
+}
+```
+
+## File Organization
 
 ```
 src/
-├── config/         # Configuration classes
-│   ├── config.php      # Centralized configuration (✅)
-│   ├── database.php    # Database connection factory (✅)
-│   └── constants.php   # Application constants (✅)
-├── core/          # Framework components (Router, Request, Response)
-│   ├── Router.php      # Request routing (✅)
-│   ├── Request.php     # Request handling (✅)
-│   └── Response.php    # Response formatting (✅)
-├── middleware/     # Route middleware
-│   ├── AuthMiddleware.php       # Authentication (✅)
-│   ├── CorsMiddleware.php       # CORS handling (✅)
-│   ├── RateLimitMiddleware.php  # Rate limiting (✅)
-│   └── ValidationMiddleware.php # Input validation (✅)
-├── controllers/    # Application controllers
-│   ├── AuthController.php   # Authentication endpoints (✅)
-│   ├── UserController.php   # User management (✅)
-│   ├── AdminController.php  # Admin operations (✅)
-│   ├── AccessController.php # Access control (✅)
-│   ├── FolderController.php # Folder management (✅)
-│   ├── FileController.php   # File management (✅)
-│   ├── QuizController.php   # Quiz management (to be implemented)
-│   └── SystemController.php # System operations (to be implemented)
-├── models/        # Data models
-│   ├── User.php          # User model (✅)
-│   ├── Access.php        # Access model (✅)
-│   ├── Folder.php        # Folder model (✅)
-│   └── File.php          # File model (✅)
-├── services/      # Business logic services
-│   ├── AuthService.php   # Authentication logic (✅)
-│   └── AccessService.php # Access control logic (✅)
-└── utils/         # Utility classes
-    ├── Logger.php      # Logging system (✅)
-    ├── Security.php    # Security utilities (✅)
-    └── Validator.php  # Input validation (✅)
+├── config/         # Configuration classes (config.php, database.php, constants.php)
+├── core/          # Framework components (Router.php, Request.php, Response.php)
+├── middleware/     # Route middleware (Auth, CORS, RateLimit, Validation)
+├── controllers/    # HTTP handlers for API endpoints
+├── models/         # Data access layer
+├── services/       # Business logic layer
+└── utils/          # Utility classes (Logger, Security, Validator)
 
-storage/
-├── rate_limits/   # Rate limiting data storage (✅)
-└── login_attempts/ # Login attempt tracking (✅)
+public/
+└── index.php         # Main entry point, route definitions
+
+database/
+└── migrations/       # Database migration files
 
 logs/              # Application logs (auto-created)
-├── app.log        # Main application log
-├── error.log      # Error log
-└── access.log     # Security audit log
+storage/           # Runtime storage (rate limits, login attempts)
+uploads/           # User uploaded files
 ```
 
 ## Development Commands
 
-### Dependency Management
 ```bash
-composer install          # Install dependencies
-composer update           # Update dependencies
-composer dump-autoload    # Regenerate autoloader
+# Install dependencies
+composer install
+
+# Run database migrations
+mysql -u username -p database_name < database/migrations/2025_04_21_phase_3_4_admin_features.sql
+
+# Run tests
+composer test
+
+# Regenerate autoloader
+composer dump-autoload
+
+# Check PHP syntax
+php -l path/to/file.php
 ```
 
-### Testing
-```bash
-composer test             # Run PHPUnit tests
-```
+## Quick Reference
 
-### Database
-```bash
-composer migrate          # Run database migrations
-```
+**Controller Pattern:**
+```php
+class ExampleController {
+    private Request $request;
+    private Response $response;
 
-### Environment Setup
-1. Copy `.env.example` to `.env`
-2. Configure environment variables for your local setup
-3. Set up database connection credentials
-4. Run database migrations to create tables
+    public function __construct() {
+        $this->request = new Request();
+        $this->response = new Response();
+    }
 
-## Key Architectural Decisions
+    public function exampleMethod(): void {
+        try {
+            $currentUser = AuthMiddleware::getCurrentUser();
 
-### PSR-4 Autoloading
-All classes follow PSR-4 autoloading with namespace `EMA\`. Classes are autoloaded from `src/` directory. Example: `EMA\Config\Config` maps to `src/config/Config.php`.
+            // Your logic here
+            $data = ['result' => 'value'];
 
-### Request/Response Pattern
-The framework uses a centralized Request and Response pattern. Controllers receive Request objects and should use Response methods for consistent API responses. All API responses use JSON format with `success`, `message`, and optional `data` or `errors` fields.
-
-### Database Layer
-Database access uses mysqli with prepared statements. The Database class provides static methods for connection management, prepared statements, and transactions. All database queries should use prepared statements to prevent SQL injection.
-
-### Configuration Management
-Environment variables are loaded via `vlucas/phpdotenv`. Required environment variables are validated on startup. Configuration values should be accessed via `Config::get('key.path')` with dot notation.
-
-### File Upload Handling
-File uploads are configured through environment variables (max size, allowed types, upload path). The system supports multiple file types (images, documents, audio, video). File paths are stored in the database while actual files are stored in the `uploads/` directory with organized subdirectories.
-
-### Access Control System
-The platform implements a complex access control system with:
-- **Access types**: `all` (public), `logged_in` (authenticated users only)
-- **User roles**: `user`, `admin`
-- **Item types**: `file`, `quiz_set`
-- **Granular permissions**: Individual user access, role-based access, admin overrides
-- **Access tracking**: Limits on how many times content can be accessed
-- **Permission types**: User-specific, public access, logged-in access
-
-### Quiz System Architecture
-The quiz system supports:
-- **Multiple choice questions** (A, B, C, D options)
-- **Multimedia content**: Text, images, audio for questions and answers
-- **Word formatting**: JSON-based formatting for bold, underline text
-- **Question types**: Reading, Listening
-- **Quiz sets**: Hierarchical organization within folders
-
-## Domain Model
-
-### Core Entities
-- **Users**: Authentication, profiles, roles (user/admin)
-- **Folders**: Hierarchical organization of content with icons
-- **Files**: Educational materials with access control and folder organization
-- **Quiz Sets**: Collections of questions with access control
-- **Questions**: Individual quiz items with multimedia content and multiple choice answers
-- **Access Permissions**: Granular access control with usage tracking
-- **Notices**: System announcements with file attachments
-- **Admin Users**: Administrative user assignments
-
-### Database Relationships
-- Users → Admin Users (one-to-one)
-- Folders → Files (one-to-many)
-- Folders → Quiz Sets (one-to-many)
-- Quiz Sets → Questions (one-to-many)
-- Users → Access Permissions (one-to-many)
-- Files/Quiz Sets → Access Permissions (one-to-many)
-
-## API Design Patterns
-
-### Authentication
-- Session-based authentication with secure headers
-- CSRF token protection for state-changing operations
-- Admin-only endpoints for administrative functions
-
-### Standard Response Format
-```json
-{
-  "success": true|false,
-  "message": "Human-readable message",
-  "data": {}, // optional, for successful responses
-  "errors": [] // optional, for error responses
+            $this->response->success('Success message', $data);
+        } catch (\Exception $e) {
+            Logger::error('Operation failed', [
+                'error' => $e->getMessage()
+            ]);
+            $this->response->error('Error message', 500);
+        }
+    }
 }
 ```
 
-### Error Handling
-- Use appropriate HTTP status codes (200, 201, 400, 401, 403, 404, 422, 500)
-- Provide clear error messages via Response methods
-- Log errors for debugging using logging system
-
-## Security Considerations
-
-- **Input validation**: All user input must be validated and sanitized
-- **SQL injection prevention**: Use prepared statements via Database::prepare()
-- **CORS configuration**: Configure allowed origins, methods, and headers in environment
-- **File upload security**: Validate file types, sizes, and scan for malicious content
-- **Session management**: Use secure session configuration with appropriate lifetime
-- **CSRF protection**: Validate CSRF tokens on state-changing operations
-
-### Using Security Utilities
-
-**Logger:**
+**Model Pattern:**
 ```php
-use EMA\Utils\Logger;
+class Example {
+    public static function findByExample(int $id): ?array {
+        $query = "SELECT * FROM table WHERE id = ?";
+        $stmt = Database::prepare($query);
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $stmt->close();
 
-Logger::info('User action', ['user_id' => $userId]);
-Logger::error('Database error', ['error' => $e->getMessage()]);
-Logger::securityEvent('Failed login attempt', ['email' => $email]);
-```
+        if ($result->num_rows > 0) {
+            return $result->fetch_assoc();
+        }
 
-**Security:**
-```php
-use EMA\Utils\Security;
-
-// CSRF tokens
-$token = Security::generateCsrfToken();
-$isValid = Security::verifyCsrfToken($token);
-
-// Password handling
-$hashed = Security::hashPassword($password);
-$isValid = Security::verifyPassword($password, $hash);
-
-// Input sanitization
-$cleanEmail = Security::sanitizeEmail($email);
-$cleanPhone = Security::sanitizePhone($phone);
-
-// Security checks
-$ip = Security::getRealIp();
-$isSecure = Security::isSecureConnection();
-```
-
-**Validator:**
-```php
-use EMA\Utils\Validator;
-
-$validator = Validator::make($data, [
-    'email' => 'required|email',
-    'password' => 'required|min:8',
-    'name' => 'required|min:2|max:100',
-]);
-
-if (!$validator->validate()) {
-    $errors = $validator->getErrors();
-    // Handle validation errors
+        return null;
+    }
 }
 ```
 
-### Using Middleware
-
-**Adding middleware to routes:**
+**Service Pattern:**
 ```php
-// All routes
-$router->addMiddleware(CorsMiddleware::class);
+class ExampleService {
+    public function processExample(array $data): array {
+        // Validation
+        $validation = Validator::make($data, [
+            'field' => 'required|rule'
+        ]);
 
-// Per-route middleware
-$router->get('/api/users', [UserController::class, 'index'], [
-    AuthMiddleware::class,
-    RateLimitMiddleware::class
-]);
+        if (!$validation->validate()) {
+            return ['success' => false, 'errors' => $validation->getErrors()];
+        }
 
-// With parameters
-$router->post('/api/admin', [AdminController::class, 'create'], [
-    new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])
-]);
-
-// With validation
-$router->post('/api/register', [AuthController::class, 'register'], [
-    new ValidationMiddleware([
-        'email' => 'required|email',
-        'password' => 'required|min:8|password',
-        'name' => 'required|min:2|max:100',
-        'phone' => 'required|phone'
-    ])
-]);
-```
-
-**AuthMiddleware static helpers:**
-```php
-// Get current user
-$user = AuthMiddleware::getCurrentUser();
-$userId = AuthMiddleware::getCurrentUserId();
-
-// Check roles
-if (AuthMiddleware::isAdmin()) {
-    // Admin-only logic
+        // Business logic
+        return ['success' => true, 'data' => $result];
+    }
 }
-
-// Require specific roles
-AuthMiddleware::requireRole(['admin', 'moderator']);
-AuthMiddleware::requireAdmin();
 ```
 
-## Authentication System
-
-Phase 2.1 implements a complete session-based authentication system with following components:
-
-**User Model (`src/models/User.php`):**
-```php
-use EMA\Models\User;
-
-// Find user by email
-$user = User::findByEmail('user@example.com');
-
-// Find user by ID
-$user = User::findById(1);
-
-// Create new user
-$user = User::create([
-    'full_name' => 'John Doe',
-    'email' => 'john@example.com',
-    'phone' => '1234567890',
-    'password' => 'securePassword123',
-    'role' => 'user'
-]);
-
-// Update user
-User::update($userId, ['full_name' => 'Jane Doe', 'phone' => '9876543210']);
-
-// Check existence
-User::isEmailExists('user@example.com');
-User::isPhoneExists('1234567890');
-
-// Password verification
-User::verifyPassword($plainPassword, $hashedPassword);
-
-// Update login/logout status
-User::updateLoginTime($userId);
-User::updateLogoutTime($userId);
-```
-
-**AuthService (`src/services/AuthService.php`):**
-```php
-use EMA\Services\AuthService;
-
-$authService = new AuthService();
-
-// Login
-$result = $authService->login([
-    'email' => 'user@example.com',
-    'password' => 'password123'
-]);
-
-// Register
-$result = $authService->register([
-    'full_name' => 'John Doe',
-    'email' => 'john@example.com',
-    'phone' => '1234567890',
-    'password' => 'securePassword123'
-]);
-
-// Logout
-$authService->logout();
-
-// Check authentication
-$authService->isAuthenticated();
-$authService->isAdmin();
-$authService->hasRole('admin');
-
-// Get current user
-$user = $authService->getCurrentUser();
-
-// Require authentication/authorization
-$authService->requireAuth();
-$authService->requireRole('admin');
-
-// Check session timeout (2 days inactivity)
-$authService->checkSessionTimeout();
-
-// Password reset
-$result = $authService->requestPasswordReset('user@example.com');
-$result = $authService->resetPassword($resetId, $token, $newPassword);
-
-// Change password (authenticated)
-$result = $authService->changePassword($userId, $currentPassword, $newPassword);
-```
-
-**AuthController (`src/controllers/AuthController.php`):**
-All authentication endpoints are handled automatically by the router. The controller handles request/response formatting and error handling.
-
-**Session Management:**
-- 2-day inactivity timeout (172800 seconds)
-- Session regeneration on login
-- Secure session configuration (HTTP-only cookies, SameSite: lax)
-- Last activity tracking and automatic cleanup
-
-**Login Attempt Tracking:**
-- IP-based attempt tracking in `storage/login_attempts/`
-- 5 failed attempts = 15-minute lockout
-- Automatic cleanup of old attempts (1 hour)
-- Failed attempt logging
-
-**Rate Limiting:**
-- Login: 20 attempts per 30 minutes per IP
-- Password reset request: 10 requests per hour per IP
-- Password reset completion: 15 attempts per hour per IP
-- Uses existing RateLimitMiddleware
-
-**Security Features:**
-- Bcrypt password hashing (cost 12)
-- Comprehensive input validation
-- CSRF token protection on all state-changing operations
-- Session hijacking protection
-- Brute force protection via IP lockout
-- Comprehensive security logging
-
-## User Management System
-
-Phase 2.2 implements a complete user management system with following components:
-
-**User Model Extensions (`src/models/User.php`):**
-```php
-use EMA\Models\User;
-
-// Get all users with pagination
-$users = User::getAllUsers($page = 1, $perPage = 20, $search = null, $role = null, $sortBy = 'created_at', $sortOrder = 'DESC');
-
-// Delete user with cascade cleanup
-$result = User::deleteUserCascade($userId);
-
-// Get all admin users
-$admins = User::getAllAdmins();
-
-// Grant admin privileges
-$result = User::grantAdmin($userId, 'admin@example.com');
-
-// Revoke admin privileges
-$result = User::revokeAdmin($userId);
-
-// Check if user is admin
-$isAdmin = User::isAdmin($userId);
-
-// Get user statistics
-$stats = User::getUserStats();
-```
-
-**UserController (`src/controllers/UserController.php`):**
-```php
-// List users (admin only)
-GET /api/users?page=1&per_page=20&search=john&role=user&sort_by=created_at&sort_order=DESC
-
-// Get user profile
-GET /api/users/{id}
-
-// Update user profile
-PUT /api/users/{id}
-Body: { full_name, phone, image } (user) or { full_name, email, phone, image, role } (admin)
-
-// Delete user (admin only)
-DELETE /api/users/{id}
-```
-
-**AdminController (`src/controllers/AdminController.php`):**
-```php
-// List admin users (admin only)
-GET /api/admins
-
-// Grant admin privileges (admin only)
-POST /api/admin/grant
-Body: { user_id, email (optional) }
-
-// List admin users (alternative format) (admin only)
-GET /api/admin/list
-
-// Approve password reset (admin only)
-POST /api/admin/approve-reset
-Body: { reset_id, action: 'approve'|'reject' }
-```
-
-## Access Control System
-
-Phase 2.3 implements a complete access control system with following components:
-
-**Access Model (`src/models/Access.php`):**
-```php
-use EMA\Models\Access;
-
-// Check if user has access
-$hasAccess = Access::checkAccess($userId, $itemId, $itemType);
-
-// Grant user access
-$result = Access::grantAccess($userId, $itemId, $itemType, $accessTimes = 0);
-
-// Revoke user access
-$result = Access::revokeAccess($userId, $itemId, $itemType);
-
-// Increment access count
-$result = Access::incrementAccess($userId, $itemId, $itemType);
-
-// Get user permissions
-$permissions = Access::getPermissions($userId, $itemType);
-
-// Grant public access
-$result = Access::grantAccessToAllUsers($itemId, $itemType, $grant = true);
-
-// Grant logged-in access
-$result = Access::grantAccessToLoggedInUsers($itemId, $itemType, $grant = true);
-
-// Get public access items
-$items = Access::getAllUsersAccess($itemType);
-
-// Get logged-in access items
-$items = Access::getLoggedInUsersAccess($itemType);
-
-// Get access statistics
-$stats = Access::getAccessStats($itemId, $itemType);
-```
-
-**AccessService (`src/services/AccessService.php`):**
-```php
-use EMA\Services\AccessService;
-
-$accessService = new AccessService();
-
-// Validate access request
-$validation = $accessService->validateAccessRequest($data);
-
-// Check access with caching
-$hasAccess = $accessService->checkAccess($userId, $itemId, $itemType);
-
-// Grant access with validation
-$result = $accessService->grantAccessWithValidation($data);
-
-// Revoke access with validation
-$result = $accessService->revokeAccessWithValidation($userId, $itemId, $itemType);
-
-// Increment access with limit check
-$result = $accessService->incrementAccessWithCheck($userId, $itemId, $itemType);
-
-// Bulk grant access
-$result = $accessService->bulkGrantAccess($userIds, $itemId, $itemType, $accessTimes = 0);
-
-// Get access report
-$report = $accessService->getAccessReport($itemId, $itemType);
-
-// Cleanup expired access
-$result = $accessService->cleanupExpiredAccess();
-```
-
-**AccessController (`src/controllers/AccessController.php`):**
-```php
-// Check access permissions (authenticated users)
-POST /api/access/check
-Body: { item_id, item_type: 'file'|'quiz_set' }
-
-// Increment access count (authenticated users)
-POST /api/access/increment
-Body: { item_id, item_type: 'file'|'quiz_set' }
-
-// Grant/revoke user access (admin only)
-POST /api/access/grant
-Body: { user_id, item_id, item_type, access_times, action: 'grant'|'revoke' }
-
-// List permissions (admin only)
-GET /api/access/permissions?user_id=123&item_type=file
-
-// Grant/revoke public access (admin only)
-POST /api/access/all-users
-Body: { item_id, item_type: 'file'|'quiz_set', grant: true|false }
-
-// List public access items (admin only)
-GET /api/access/all-users?item_type=file
-
-// Grant/revoke logged-in access (admin only)
-POST /api/access/login-users
-Body: { item_id, item_type: 'file'|'quiz_set', grant: true|false }
-
-// List logged-in access items (admin only)
-GET /api/access/login-users?item_type=file
-```
-
-**Access Control Features:**
-- User access checking (admin bypass, public access, individual permissions)
-- Access counting and limit enforcement
-- Public access management (all users)
-- Logged-in access management (authenticated users)
-- Bulk access operations
-- Access statistics and reporting
-- Admin-only access control enforcement
-- Comprehensive security logging
-
-## Legacy Code Migration
-
-The project is transitioning from legacy PHP files (currently deleted in git) to a new architecture. Legacy API endpoints should be gradually migrated to:
-1. Controllers in `src/controllers/`
-2. Models in `src/models/`
-3. Services in `src/services/` for business logic
-4. Middleware in `src/middleware/` for cross-cutting concerns
-
-When implementing new features, use the new architecture rather than legacy patterns.
-
-## Testing
-
-PHPUnit is configured for testing. Test files should be placed in `tests/` directory following PSR-4 autoloading with namespace `EMA\Tests\`. The project includes database fixtures in SQL file for testing purposes.
+## Important Notes
+
+- All database queries use prepared statements for SQL injection prevention
+- Session timeout is 2 days (172800 seconds)
+- CSRF tokens required on all POST/PUT/DELETE operations
+- File uploads are validated for MIME type, size, and extension
+- Rate limiting is applied to sensitive endpoints
+- All admin actions are logged for audit purposes
+- Use `EMA\Config\Constants::ROLE_ADMIN` for admin role references
 
 ## graphify
 
 This project has a graphify knowledge graph at graphify-out/.
 
-Rules:
+**Rules:**
 - Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
 - If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
 - After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)
