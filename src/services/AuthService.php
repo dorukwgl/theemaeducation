@@ -84,12 +84,6 @@ class AuthService
         $_SESSION['user_role'] = $user->getRole();
         $_SESSION['last_activity'] = time();
 
-        Logger::info('User logged in', [
-            'user_id' => $user->getId(),
-            'email' => $user->getEmail(),
-            'ip' => $ip
-        ]);
-
         return [
             'success' => true,
             'message' => 'Login successful',

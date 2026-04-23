@@ -1,0 +1,6 @@
+[2026-04-23T10:06:03.396667+00:00] stack.DEBUG: Request initialized {"method":"GET","uri":"/","ip":"::1"} []
+[2026-04-23T10:06:03.399942+00:00] stack.INFO: Application started {"method":"GET","uri":"/","ip":"::1"} []
+[2026-04-23T10:06:03.400990+00:00] stack.WARNING: Route not found {"method":"GET","uri":""} []
+[2026-04-23T10:06:03.456848+00:00] stack.DEBUG: Request initialized {"method":"GET","uri":"/favicon.ico","ip":"::1"} []
+[2026-04-23T10:06:03.457137+00:00] stack.INFO: Application started {"method":"GET","uri":"/favicon.ico","ip":"::1"} []
+[2026-04-23T10:06:03.458082+00:00] stack.WARNING: Route not found {"method":"GET","uri":"/favicon.ico"} []

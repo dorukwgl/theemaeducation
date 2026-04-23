@@ -23,12 +23,6 @@ class AuthMiddleware
 
         // Check if user is authenticated
         if (!$this->isAuthenticated()) {
-            Logger::logSecurityEvent('Unauthenticated access attempt', [
-                'ip' => Security::getRealIp(),
-                'uri' => Security::getRequestUri(),
-                'user_agent' => Security::getUserAgent()
-            ]);
-
             $response = new Response();
             if (Security::isAjaxRequest() || Security::isJsonRequest()) {
                 $response->unauthorized('Authentication required');
@@ -39,14 +33,6 @@ class AuthMiddleware
 
         // Check if user has required roles
         if (!empty($this->requiredRoles) && !$this->hasRequiredRole()) {
-            Logger::logSecurityEvent('Unauthorized access attempt', [
-                'user_id' => $_SESSION[\EMA\Config\Constants::SESSION_USER_ID] ?? null,
-                'required_roles' => $this->requiredRoles,
-                'user_role' => $_SESSION[\EMA\Config\Constants::SESSION_USER_ROLE] ?? null,
-                'ip' => Security::getRealIp(),
-                'uri' => Security::getRequestUri()
-            ]);
-
             $response = new Response();
             $response->forbidden('You do not have permission to access this resource');
         }
@@ -56,21 +42,11 @@ class AuthMiddleware
 
         // Check session timeout
         if ($this->isSessionExpired()) {
-            Logger::info('Session expired', [
-                'user_id' => $_SESSION[\EMA\Config\Constants::SESSION_USER_ID] ?? null
-            ]);
-
             $this->logout();
 
             $response = new Response();
             $response->unauthorized('Session expired. Please login again.');
         }
-
-        Logger::debug('Authentication middleware passed', [
-            'user_id' => $_SESSION[\EMA\Config\Constants::SESSION_USER_ID] ?? null,
-            'role' => $_SESSION[\EMA\Config\Constants::SESSION_USER_ROLE] ?? null
-        ]);
-
         return $next();
     }
 
