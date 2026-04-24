@@ -33,17 +33,8 @@ class CorsMiddleware
         // Handle preflight requests
         if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
             http_response_code(204);
-            Logger::info('CORS preflight request handled', [
-                'origin' => $origin,
-                'method' => $_SERVER['REQUEST_METHOD']
-            ]);
             exit;
         }
-
-        Logger::debug('CORS headers set', [
-            'origin' => $origin,
-            'method' => $_SERVER['REQUEST_METHOD']
-        ]);
 
         return $next();
     }

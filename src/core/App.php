@@ -38,12 +38,6 @@ class App
     public function run(): void
     {
         try {
-            Logger::info('Application started', [
-                'method' => $this->request->getMethod(),
-                'uri' => $this->request->getUri(),
-                'ip' => $this->request->getIp()
-            ]);
-
             // Add global middleware
             $this->router->addMiddleware(CorsMiddleware::class);
 
@@ -147,6 +141,7 @@ class App
 
         $errorType = $errorTypes[$errno] ?? 'Unknown Error';
 
+        // Log full error details internally for debugging
         Logger::error('PHP Error', [
             'type' => $errorType,
             'message' => $errstr,
@@ -154,13 +149,12 @@ class App
             'line' => $errline,
         ]);
 
+        // Never expose file/line information in API responses
         if (Config::isDebug()) {
-            $this->response->error($errstr, 500, [
-                'type' => $errorType,
-                'file' => $errfile,
-                'line' => $errline,
-            ]);
+            // In debug mode, show error type and message but not file/line
+            $this->response->error("$errorType: $errstr", 500);
         } else {
+            // In production, show generic message
             $this->response->error('An error occurred', 500);
         }
 
@@ -169,6 +163,7 @@ class App
 
     public function handleException(\Throwable $exception): void
     {
+        // Always log full exception details internally for debugging
         Logger::error('Uncaught Exception', [
             'message' => $exception->getMessage(),
             'code' => $exception->getCode(),
@@ -177,13 +172,12 @@ class App
             'trace' => $exception->getTraceAsString(),
         ]);
 
+        // Never expose sensitive information in API responses
         if (Config::isDebug()) {
-            $this->response->error($exception->getMessage(), 500, [
-                'file' => $exception->getFile(),
-                'line' => $exception->getLine(),
-                'trace' => $exception->getTraceAsString(),
-            ]);
+            // In debug mode, show exception message but not file/line/trace
+            $this->response->error($exception->getMessage(), 500);
         } else {
+            // In production, show generic message
             $this->response->error('An error occurred', 500);
         }
 
@@ -195,12 +189,6 @@ class App
         $error = error_get_last();
 
         if ($error !== null && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
-            Logger::critical('Fatal Error', [
-                'message' => $error['message'],
-                'file' => $error['file'],
-                'line' => $error['line'],
-            ]);
-
             if (!Config::isDebug()) {
                 http_response_code(500);
                 echo json_encode([

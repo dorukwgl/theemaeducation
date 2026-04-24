@@ -196,12 +196,7 @@ class User
 
             $stmt->execute();
 
-            $userId = Database::insertId();
-            Logger::info('User created', [
-                'user_id' => $userId,
-                'email' => $data['email']
-            ]);
-
+            $userId = Database::lastInsertId();
             return self::findById($userId);
         } catch (\Exception $e) {
             Logger::error('Error creating user', [
@@ -245,10 +240,6 @@ class User
 
             $result = $stmt->execute();
 
-            if ($result) {
-                Logger::info('User updated', ['user_id' => $id]);
-            }
-
             return $result;
         } catch (\Exception $e) {
             Logger::error('Error updating user', [
@@ -265,10 +256,6 @@ class User
             $stmt = Database::prepare("DELETE FROM users WHERE id = ?");
             $stmt->bind_param('i', $id);
             $result = $stmt->execute();
-
-            if ($result) {
-                Logger::info('User deleted', ['user_id' => $id]);
-            }
 
             return $result;
         } catch (\Exception $e) {
@@ -393,12 +380,6 @@ class User
             // Commit transaction
             Database::commit();
 
-            Logger::logSecurityEvent('Admin privileges granted', [
-                'user_id' => $userId,
-                'email' => $user->getEmail(),
-                'granted_by' => $grantedBy
-            ]);
-
             return true;
         } catch (\Exception $e) {
             // Rollback on any error
@@ -434,11 +415,6 @@ class User
 
             // Commit transaction
             Database::commit();
-
-            Logger::logSecurityEvent('Admin privileges revoked', [
-                'user_id' => $userId,
-                'revoked_by' => $_SESSION['user_id'] ?? null
-            ]);
 
             return true;
         } catch (\Exception $e) {
@@ -544,13 +520,6 @@ class User
             // Commit transaction
             Database::commit();
 
-            if ($result) {
-                Logger::logSecurityEvent('User deleted with cascade cleanup', [
-                    'user_id' => $userId,
-                    'admin_id' => $_SESSION['user_id'] ?? null
-                ]);
-            }
-
             return $result;
         } catch (\Exception $e) {
             // Rollback on any error
@@ -581,8 +550,8 @@ class User
     public static function getAllUsers(
         int $page = 1,
         int $perPage = 20,
-        string $search = null,
-        string $role = null,
+        ?string $search = null,
+        ?string $role = null,
         string $sortBy = 'created_at',
         string $sortOrder = 'DESC'
     ): array {

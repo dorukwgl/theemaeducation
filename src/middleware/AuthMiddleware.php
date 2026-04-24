@@ -2,7 +2,6 @@
 
 namespace EMA\Middleware;
 
-use EMA\Utils\Logger;
 use EMA\Utils\Security;
 use EMA\Core\Response;
 
@@ -86,10 +85,6 @@ class AuthMiddleware
         // Destroy session
         session_unset();
         session_destroy();
-
-        Logger::info('User logged out due to session expiration', [
-            'ip' => Security::getRealIp()
-        ]);
     }
 
     public static function getCurrentUserId(): ?int

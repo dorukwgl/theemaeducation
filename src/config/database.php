@@ -30,7 +30,7 @@ class Database
     {
         self::initialize();
 
-        if (self::$connection !== null && self::$connection->ping()) {
+        if (self::$connection !== null && self::isConnectionAlive(self::$connection)) {
             self::$connectionCount++;
             return self::$connection;
         }
@@ -50,12 +50,6 @@ class Database
 
             self::$connection->set_charset(self::$config['charset']);
             self::$connectionCount++;
-
-            Logger::info("Database connection established", [
-                'host' => self::$config['host'],
-                'database' => self::$config['database'],
-                'connection_count' => self::$connectionCount
-            ]);
 
             return self::$connection;
         } catch (Exception $e) {
@@ -143,13 +137,28 @@ class Database
         if (self::$connection !== null) {
             self::$connection->close();
             self::$connection = null;
-            Logger::info("Database connection closed");
         }
     }
 
     public static function getConnectionCount(): int
     {
         return self::$connectionCount;
+    }
+
+    private static function isConnectionAlive(\mysqli $conn): bool
+    {
+        try {
+            $result = $conn->query('SELECT 1');
+            if ($result === false || $conn->errno === 2006) {
+                return false;
+            }
+            if ($result) {
+                $result->free();
+            }
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 
     public static function resetConnectionCount(): void

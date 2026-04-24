@@ -30,12 +30,6 @@ class Request
         $this->json = $this->parseJson();
         $this->ip = $this->getClientIp();
         $this->userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
-
-        Logger::debug("Request initialized", [
-            'method' => $this->method,
-            'uri' => $this->uri,
-            'ip' => $this->ip
-        ]);
     }
 
     private function parseHeaders(): array
@@ -57,10 +51,6 @@ class Request
             if (json_last_error() === JSON_ERROR_NONE) {
                 return $data;
             }
-            Logger::warning("JSON parse error", [
-                'error' => json_last_error_msg(),
-                'body' => $this->body
-            ]);
         }
         return [];
     }

@@ -83,7 +83,7 @@ class Response
         ];
 
         if ($errors !== null) {
-            $response['errors'] = $errors;
+            $response['errors'] = $this->parseErrorIntoReadable($errors);
         }
 
         $this->json($response, $status);
@@ -132,7 +132,7 @@ class Response
         $this->send();
     }
 
-    public function download(string $filePath, string $fileName = null): void
+    public function download(string $filePath, ?string $fileName = null): void
     {
         if (!file_exists($filePath)) {
             $this->notFound('File not found');
@@ -141,7 +141,7 @@ class Response
 
         $fileName = $fileName ?? basename($filePath);
         $fileSize = filesize($filePath);
-        $mimeType = mime_content_type($filePath);
+        $mimeType = $mimeType ?? mime_content_type($filePath);
 
         $this->setStatusCode(200);
         $this->setHeaders([
@@ -161,17 +161,11 @@ class Response
             flush();
         }
         fclose($file);
-
-        Logger::info("File download", [
-            'file' => $filePath,
-            'filename' => $fileName,
-            'size' => $fileSize
-        ]);
-
+        
         exit;
     }
 
-    public function stream(string $filePath, string $mimeType = null): void
+    public function stream(string $filePath, ?string $mimeType = null): void
     {
         if (!file_exists($filePath)) {
             $this->notFound('File not found');
@@ -207,12 +201,17 @@ class Response
         }
         fclose($file);
 
-        Logger::info("File stream", [
-            'file' => $filePath,
-            'range' => $range
-        ]);
-
         exit;
+    }
+
+    private function parseErrorIntoReadable($errors): string
+    {
+        // return the first error message of first field
+        if (is_array($errors)) {
+            $firstField = array_key_first($errors);
+            return $errors[$firstField][0];
+        }
+        return $errors;
     }
 
     private function parseRangeHeader(int $fileSize): array
@@ -256,13 +255,6 @@ class Response
         if ($this->content !== null) {
             echo $this->content;
         }
-
-        Logger::debug("Response sent", [
-            'status' => $this->statusCode,
-            'content_type' => $this->contentType,
-            'content_length' => strlen($this->content ?? '')
-        ]);
-
         exit;
     }
 

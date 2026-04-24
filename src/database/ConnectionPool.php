@@ -24,7 +24,7 @@ class ConnectionPool
         try {
             // Check for available connections in pool
             foreach (self::$pool as $key => $conn) {
-                if (!isset(self::$inUse[$key]) && $conn->ping()) {
+                if (!isset(self::$inUse[$key]) && self::isConnectionAlive($conn)) {
                     self::$inUse[$key] = true;
                     Logger::debug('Reusing pooled connection', ['pool_key' => $key]);
                     return $conn;
@@ -126,12 +126,33 @@ class ConnectionPool
     }
 
     /**
+     * Check if a connection is alive
+     * @param mysqli $conn Connection to check
+     * @return bool True if connection is alive, false otherwise
+     */
+    private static function isConnectionAlive(\mysqli $conn): bool
+    {
+        try {
+            $result = $conn->query('SELECT 1');
+            if ($result === false || $conn->errno === 2006) {
+                return false;
+            }
+            if ($result) {
+                $result->free();
+            }
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
      * Clean up dead connections from pool
      */
     public static function cleanup(): void
     {
         foreach (self::$pool as $key => $conn) {
-            if (!$conn->ping()) {
+            if (!self::isConnectionAlive($conn)) {
                 Logger::warning('Removing dead connection from pool', ['pool_key' => $key]);
                 unset(self::$pool[$key]);
                 unset(self::$inUse[$key]);

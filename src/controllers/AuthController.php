@@ -29,9 +29,9 @@ class AuthController
             $result = $this->authService->login($data);
 
             if ($result['success']) {
-                $this->response->success($result['message'], $result['data']);
+                $this->response->success($result['data'], $result['message']);
             } else {
-                $this->response->error($result['message'], 401);
+                $this->response->error($result['message'], 401, $result['errors'] ?? null);
             }
         } catch (\Exception $e) {
             Logger::error('Login endpoint error', [
@@ -50,7 +50,7 @@ class AuthController
             $result = $this->authService->register($data);
 
             if ($result['success']) {
-                $this->response->success($result['message'], $result['data']);
+                $this->response->success($result['data'], $result['message']);
             } else {
                 if (isset($result['errors'])) {
                     $this->response->validationError($result['errors'], $result['message']);
@@ -173,7 +173,7 @@ class AuthController
             $user = $this->authService->getCurrentUser();
 
             if ($user) {
-                $this->response->success('User data retrieved', $user);
+                $this->response->success($user, 'User data retrieved');
             } else {
                 $this->response->error('Not authenticated', 401);
             }

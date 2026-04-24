@@ -42,14 +42,6 @@ class Validator
         }
 
         $isValid = empty($this->errors);
-
-        if (!$isValid) {
-            Logger::info('Validation failed', [
-                'errors' => $this->errors,
-                'data' => $this->sanitizeDataForLogging()
-            ]);
-        }
-
         return $isValid;
     }
 

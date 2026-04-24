@@ -43,7 +43,7 @@ class AuthService
         if (!$validation->validate()) {
             return [
                 'success' => false,
-                'message' => 'Validation failed',
+                'message' => 'Validation failed miserably',
                 'errors' => $validation->getErrors()
             ];
         }
@@ -136,11 +136,6 @@ class AuthService
             $_SESSION['user_role'] = $user->getRole();
             $_SESSION['last_activity'] = time();
 
-            Logger::info('User registered', [
-                'user_id' => $user->getId(),
-                'email' => $user->getEmail()
-            ]);
-
             return [
                 'success' => true,
                 'message' => 'Registration successful',
@@ -165,7 +160,6 @@ class AuthService
 
         if ($userId) {
             User::updateLogoutTime($userId);
-            Logger::info('User logged out', ['user_id' => $userId]);
         }
 
         $_SESSION = [];
@@ -231,10 +225,6 @@ class AuthService
 
         if (time() - $lastActivity > $timeout) {
             $this->logout();
-            Logger::info('Session timeout', [
-                'user_id' => $_SESSION['user_id'] ?? null,
-                'last_activity' => $lastActivity
-            ]);
             return false;
         }
 
@@ -271,7 +261,7 @@ class AuthService
             $stmt->bind_param('is', $user->getId(), $email);
             $stmt->execute();
 
-            $resetId = \EMA\Config\Database::insertId();
+            $resetId = \EMA\Config\Database::lastInsertId();
             $token = bin2hex(random_bytes(32));
 
             $tokenHash = hash('sha256', $token);
@@ -282,10 +272,6 @@ class AuthService
             $updateStmt->bind_param('si', $tokenHash, $resetId);
             $updateStmt->execute();
 
-            Logger::logSecurityEvent('Password reset requested', [
-                'user_id' => $user->getId(),
-                'email' => $email
-            ]);
 
             return [
                 'success' => true,
@@ -360,10 +346,6 @@ class AuthService
                 $updateStmt->bind_param('i', $resetId);
                 $updateStmt->execute();
 
-                Logger::logSecurityEvent('Password reset completed', [
-                    'user_id' => $user->getId()
-                ]);
-
                 return [
                     'success' => true,
                     'message' => 'Password reset successful'
@@ -431,10 +413,6 @@ class AuthService
         try {
             User::update($userId, ['password' => $newPassword]);
 
-            Logger::logSecurityEvent('Password changed', [
-                'user_id' => $userId
-            ]);
-
             return [
                 'success' => true,
                 'message' => 'Password changed successfully'
@@ -490,12 +468,6 @@ class AuthService
 
         if ($attemptsData['failed_count'] >= self::MAX_LOGIN_ATTEMPTS) {
             $attemptsData['locked_until'] = time() + self::LOCKOUT_DURATION;
-
-            Logger::logSecurityEvent('Account locked due to failed attempts', [
-                'ip' => $ip,
-                'email' => $email,
-                'failed_count' => $attemptsData['failed_count']
-            ]);
         }
 
         $this->saveAttempts($ip, $attemptsData);

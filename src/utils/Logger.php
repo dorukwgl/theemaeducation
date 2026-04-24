@@ -3,7 +3,6 @@
 namespace EMA\Utils;
 
 use Monolog\Logger as MonologLogger;
-use Monolog\Handler\StreamHandler;
 use Monolog\Handler\RotatingFileHandler;
 use Monolog\Level;
 
@@ -43,29 +42,6 @@ class Logger
             $monologLevel
         );
         self::$instance->pushHandler($appHandler);
-
-        // Error log
-        $errorHandler = new RotatingFileHandler(
-            $logPath . '/error.log',
-            30,
-            Level::Error
-        );
-        self::$instance->pushHandler($errorHandler);
-
-        // Access log (for security auditing)
-        $accessHandler = new RotatingFileHandler(
-            $logPath . '/access.log',
-            30,
-            Level::Info
-        );
-        $accessHandler->pushProcessor(function ($record) {
-            $record['extra']['ip'] = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-            $record['extra']['user_agent'] = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
-            $record['extra']['uri'] = $_SERVER['REQUEST_URI'] ?? 'unknown';
-            $record['extra']['method'] = $_SERVER['REQUEST_METHOD'] ?? 'unknown';
-            return $record;
-        });
-        self::$instance->pushHandler($accessHandler);
     }
 
     private static function getMonologLevel(string $level): Level
@@ -83,59 +59,59 @@ class Logger
         };
     }
 
-    public static function debug(string $message, array $context = []): void
-    {
-        self::getInstance()->debug($message, self::sanitizeContext($context));
-    }
+    // public static function debug(string $message, array $context = []): void
+    // {
+    //     self::getInstance()->debug($message, self::sanitizeContext($context));
+    // }
 
-    public static function info(string $message, array $context = []): void
-    {
-        self::getInstance()->info($message, self::sanitizeContext($context));
-    }
+    // public static function info(string $message, array $context = []): void
+    // {
+    //     self::getInstance()->info($message, self::sanitizeContext($context));
+    // }
 
-    public static function notice(string $message, array $context = []): void
-    {
-        self::getInstance()->notice($message, self::sanitizeContext($context));
-    }
+    // public static function notice(string $message, array $context = []): void
+    // {
+    //     self::getInstance()->notice($message, self::sanitizeContext($context));
+    // }
 
-    public static function warning(string $message, array $context = []): void
-    {
-        self::getInstance()->warning($message, self::sanitizeContext($context));
-    }
+    // public static function warning(string $message, array $context = []): void
+    // {
+    //     self::getInstance()->warning($message, self::sanitizeContext($context));
+    // }
 
     public static function error(string $message, array $context = []): void
     {
         self::getInstance()->error($message, self::sanitizeContext($context));
     }
 
-    public static function critical(string $message, array $context = []): void
-    {
-        self::getInstance()->critical($message, self::sanitizeContext($context));
-    }
+    // public static function critical(string $message, array $context = []): void
+    // {
+    //     self::getInstance()->critical($message, self::sanitizeContext($context));
+    // }
 
-    public static function alert(string $message, array $context = []): void
-    {
-        self::getInstance()->alert($message, self::sanitizeContext($context));
-    }
+    // public static function alert(string $message, array $context = []): void
+    // {
+    //     self::getInstance()->alert($message, self::sanitizeContext($context));
+    // }
 
-    public static function emergency(string $message, array $context = []): void
-    {
-        self::getInstance()->emergency($message, self::sanitizeContext($context));
-    }
+    // public static function emergency(string $message, array $context = []): void
+    // {
+    //     self::getInstance()->emergency($message, self::sanitizeContext($context));
+    // }
 
-    public static function logAccess(string $action, array $context = []): void
-    {
-        $context['action'] = $action;
-        $context['timestamp'] = date('Y-m-d H:i:s');
-        self::getInstance()->info('Access: ' . $action, self::sanitizeContext($context));
-    }
+    // public static function logAccess(string $action, array $context = []): void
+    // {
+    //     $context['action'] = $action;
+    //     $context['timestamp'] = date('Y-m-d H:i:s');
+    //     self::getInstance()->info('Access: ' . $action, self::sanitizeContext($context));
+    // }
 
-    public static function logSecurityEvent(string $event, array $context = []): void
-    {
-        $context['event_type'] = $event;
-        $context['timestamp'] = date('Y-m-d H:i:s');
-        self::getInstance()->warning('Security Event: ' . $event, self::sanitizeContext($context));
-    }
+    // public static function logSecurityEvent(string $event, array $context = []): void
+    // {
+    //     $context['event_type'] = $event;
+    //     $context['timestamp'] = date('Y-m-d H:i:s');
+    //     self::getInstance()->warning('Security Event: ' . $event, self::sanitizeContext($context));
+    // }
 
     public static function logError(\Throwable $exception, array $context = []): void
     {

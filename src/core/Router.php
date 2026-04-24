@@ -89,22 +89,10 @@ class Router
             if (preg_match($route['pattern'], $uri, $matches)) {
                 $params = array_filter($matches, 'is_string', ARRAY_FILTER_USE_KEY);
 
-                Logger::info("Route matched", [
-                    'method' => $method,
-                    'uri' => $uri,
-                    'handler' => is_array($route['handler']) ? get_class($route['handler'][0]) . '::' . $route['handler'][1] : 'closure',
-                    'params' => $params
-                ]);
-
                 $this->executeRoute($route, $params);
                 return;
             }
         }
-
-        Logger::warning("Route not found", [
-            'method' => $method,
-            'uri' => $uri
-        ]);
 
         $this->handleNotFound();
     }

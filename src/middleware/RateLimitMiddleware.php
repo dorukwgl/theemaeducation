@@ -2,7 +2,6 @@
 
 namespace EMA\Middleware;
 
-use EMA\Utils\Logger;
 use EMA\Utils\Security;
 use EMA\Config\Config;
 use EMA\Core\Response;
@@ -10,7 +9,7 @@ use EMA\Core\Response;
 class RateLimitMiddleware
 {
     private string $ip;
-    private string $userId;
+    private ?string $userId;
     private bool $enabled;
     private int $maxRequests;
     private int $window;
@@ -39,11 +38,6 @@ class RateLimitMiddleware
 
         // Check rate limit for IP
         if (!$this->checkRateLimit('ip', $this->ip)) {
-            Logger::logSecurityEvent('Rate limit exceeded for IP', [
-                'ip' => $this->ip,
-                'endpoint' => Security::getRequestUri()
-            ]);
-
             $response = new Response();
             $response->error('Too many requests. Please try again later.', 429);
             $response->setHeader('X-RateLimit-Limit', $this->maxRequests);
@@ -54,12 +48,6 @@ class RateLimitMiddleware
 
         // Check rate limit for user if authenticated
         if (!empty($this->userId) && !$this->checkRateLimit('user', $this->userId)) {
-            Logger::logSecurityEvent('Rate limit exceeded for user', [
-                'user_id' => $this->userId,
-                'ip' => $this->ip,
-                'endpoint' => Security::getRequestUri()
-            ]);
-
             $response = new Response();
             $response->error('Too many requests. Please try again later.', 429);
             $response->setHeader('X-RateLimit-Limit', $this->maxRequests);
@@ -76,12 +64,6 @@ class RateLimitMiddleware
         header("X-RateLimit-Limit: $this->maxRequests");
         header("X-RateLimit-Remaining: $ipRemaining");
         header("X-RateLimit-Reset: " . $ipUsage['reset_time']);
-
-        Logger::debug('Rate limit check passed', [
-            'ip' => $this->ip,
-            'user_id' => $this->userId ?: 'guest',
-            'remaining' => $ipRemaining
-        ]);
 
         return $next();
     }
@@ -174,20 +156,16 @@ class RateLimitMiddleware
 
         if (file_exists($filePath)) {
             unlink($filePath);
-            Logger::info('Rate limit reset', [
-                'type' => $type,
-                'identifier' => $identifier
-            ]);
         }
     }
 
-    public function resetIpRateLimit(string $ip = null): void
+    public function resetIpRateLimit(string $ip = '#.#.#.#'): void
     {
         $ip = $ip ?? $this->ip;
         $this->resetRateLimit('ip', $ip);
     }
 
-    public function resetUserRateLimit(string $userId = null): void
+    public function resetUserRateLimit(string $userId = '#.#.#.#'): void
     {
         $userId = $userId ?? $this->userId;
         if ($userId) {

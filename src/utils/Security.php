@@ -16,8 +16,6 @@ class Security
         $token = bin2hex(random_bytes(32));
         $_SESSION[\EMA\Config\Constants::SESSION_CSRF_TOKEN] = $token;
 
-        Logger::debug('CSRF token generated');
-
         return $token;
     }
 
@@ -30,16 +28,13 @@ class Security
         $sessionToken = $_SESSION[\EMA\Config\Constants::SESSION_CSRF_TOKEN] ?? null;
 
         if ($sessionToken === null) {
-            Logger::warning('CSRF token verification failed - no session token');
             return false;
         }
 
         if (!hash_equals($sessionToken, $token)) {
-            Logger::logSecurityEvent('CSRF token mismatch');
             return false;
         }
 
-        Logger::debug('CSRF token verified successfully');
         return true;
     }
 
@@ -65,20 +60,12 @@ class Security
             throw new Exception('Password hashing failed');
         }
 
-        Logger::debug('Password hashed successfully');
         return $hashed;
     }
 
     public static function verifyPassword(string $password, string $hash): bool
     {
         $result = password_verify($password, $hash);
-
-        if (!$result) {
-            Logger::logSecurityEvent('Password verification failed', [
-                'hash_length' => strlen($hash)
-            ]);
-        }
-
         return $result;
     }
 
