@@ -55,7 +55,7 @@ class AuthController
                 if (isset($result['errors'])) {
                     $this->response->validationError($result['errors'], $result['message']);
                 } else {
-                    $this->response->error($result['message'], 422);
+                    $this->response->error($result['message'], 400);
                 }
             }
         } catch (\Exception $e) {

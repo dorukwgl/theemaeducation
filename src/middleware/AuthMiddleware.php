@@ -2,7 +2,6 @@
 
 namespace EMA\Middleware;
 
-use EMA\Utils\Security;
 use EMA\Core\Response;
 
 class AuthMiddleware
@@ -23,11 +22,7 @@ class AuthMiddleware
         // Check if user is authenticated
         if (!$this->isAuthenticated()) {
             $response = new Response();
-            if (Security::isAjaxRequest() || Security::isJsonRequest()) {
-                $response->unauthorized('Authentication required');
-            } else {
-                $response->redirect('/login.php');
-            }
+            $response->unauthorized('Authentication required');
         }
 
         // Check if user has required roles

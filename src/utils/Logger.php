@@ -68,6 +68,11 @@ class Logger
     // {
     //     self::getInstance()->info($message, self::sanitizeContext($context));
     // }
+    
+    public static function log(string $message, array $context = []): void
+    {
+        self::getInstance()->info($message, self::sanitizeContext($context));
+    }
 
     // public static function notice(string $message, array $context = []): void
     // {

@@ -177,6 +177,9 @@ class User
     public static function create(array $data): self
     {
         try {
+            // Start transaction to prevent race conditions
+            Database::beginTransaction();
+            
             $hashedPassword = Security::hashPassword($data['password']);
 
             $stmt = Database::prepare(
@@ -196,9 +199,22 @@ class User
 
             $stmt->execute();
 
+            // Get the ID immediately after insert within the same transaction
             $userId = Database::lastInsertId();
-            return self::findById($userId);
+            
+            // Create user object directly from input data + new ID
+            $userData = $data;
+            $userData['id'] = $userId;
+            $userData['password'] = $hashedPassword;
+            $userData['role'] = $role;
+            $userData['created_at'] = date('Y-m-d H:i:s');
+            
+            // Commit transaction
+            Database::commit();
+            
+            return new self($userData);
         } catch (\Exception $e) {
+            Database::rollback();
             Logger::error('Error creating user', [
                 'email' => $data['email'] ?? 'unknown',
                 'error' => $e->getMessage()

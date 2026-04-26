@@ -18,7 +18,7 @@ class RateLimitMiddleware
     public function __construct()
     {
         $this->ip = Security::getRealIp();
-        $this->userId = $this->getUserId();
+        $this->userId = $this->getUserId() ?? null;
         $this->enabled = Config::get('rate_limit.enabled', true);
         $this->maxRequests = Config::get('rate_limit.max_requests', 100);
         $this->window = Config::get('rate_limit.window', 60); // seconds
