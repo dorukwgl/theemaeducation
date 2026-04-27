@@ -327,8 +327,8 @@ class AccessController
             }
 
             // Get query parameters
-            $userId = $this->request->query('user_id');
-            $itemType = $this->request->query('item_type');
+            $userId = $this->request->getQueryParameter('user_id');
+            $itemType = $this->request->getQueryParameter('item_type');
 
             // Validate parameters
             if ($userId !== null) {
@@ -465,7 +465,7 @@ class AccessController
             }
 
             // Get query parameters
-            $itemType = $this->request->query('item_type');
+            $itemType = $this->request->getQueryParameter('item_type');
 
             // Validate item type
             if ($itemType !== null && !in_array($itemType, ['file', 'quiz_set'])) {
@@ -581,7 +581,7 @@ class AccessController
             }
 
             // Get query parameters
-            $itemType = $this->request->query('item_type');
+            $itemType = $this->request->getQueryParameter('item_type');
 
             // Validate item type
             if ($itemType !== null && !in_array($itemType, ['file', 'quiz_set'])) {

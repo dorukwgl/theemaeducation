@@ -5,7 +5,6 @@ namespace EMA\Controllers;
 use EMA\Models\User;
 use EMA\Utils\Validator;
 use EMA\Utils\Logger;
-use EMA\Utils\Security;
 use EMA\Core\Request;
 use EMA\Core\Response;
 use EMA\Middleware\AuthMiddleware;
@@ -25,12 +24,12 @@ class UserController
     {
         try {
             // Get query parameters
-            $page = (int) ($this->request->query('page', 1));
-            $perPage = (int) ($this->request->query('per_page', 20));
-            $search = $this->request->query('search');
-            $role = $this->request->query('role');
-            $sortBy = $this->request->query('sort_by', 'created_at');
-            $sortOrder = $this->request->query('sort_order', 'DESC');
+            $page = (int) ($this->request->getQueryParameter('page', 1));
+            $perPage = (int) ($this->request->getQueryParameter('per_page', 20));
+            $search = $this->request->getQueryParameter('search');
+            $role = $this->request->getQueryParameter('role');
+            $sortBy = $this->request->getQueryParameter('sort_by', 'created_at');
+            $sortOrder = $this->request->getQueryParameter('sort_order', 'DESC');
 
             // Validate parameters
             $validation = Validator::make([
@@ -57,14 +56,7 @@ class UserController
             // Get users with pagination
             $result = User::getAllUsers($page, $perPage, $search, $role, $sortBy, $sortOrder);
 
-            Logger::info('User listing accessed', [
-                'admin_id' => AuthMiddleware::getCurrentUserId(),
-                'page' => $page,
-                'search' => $search,
-                'role' => $role
-            ]);
-
-            $this->response->success('Users retrieved successfully', $result);
+            $this->response->success($result, 'Users retrieved successfully');
         } catch (\Exception $e) {
             Logger::error('User listing error', [
                 'error' => $e->getMessage(),
@@ -88,11 +80,6 @@ class UserController
 
             // Users can only view their own profile, admins can view any
             if ($currentUser['role'] !== 'admin' && $currentUserId !== $id) {
-                Logger::logSecurityEvent('Unauthorized user profile access attempt', [
-                    'user_id' => $currentUserId,
-                    'target_user_id' => $id,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('You can only view your own profile', 403);
                 return;
             }
@@ -105,16 +92,11 @@ class UserController
                 return;
             }
 
-            Logger::info('User profile viewed', [
-                'viewer_id' => $currentUserId,
-                'viewed_user_id' => $id
-            ]);
-
             // Return user data without password
             $userData = $user->toArray();
             unset($userData['password']);
 
-            $this->response->success('User profile retrieved', $userData);
+            $this->response->success($userData, 'User profile retrieved');
         } catch (\Exception $e) {
             Logger::error('User profile retrieval error', [
                 'user_id' => $id,
@@ -139,11 +121,6 @@ class UserController
 
             // Users can only update their own profile, admins can update any
             if ($currentUser['role'] !== 'admin' && $currentUserId !== $id) {
-                Logger::logSecurityEvent('Unauthorized user profile update attempt', [
-                    'user_id' => $currentUserId,
-                    'target_user_id' => $id,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('You can only update your own profile', 403);
                 return;
             }
@@ -197,18 +174,12 @@ class UserController
             $result = User::update($id, $data);
 
             if ($result) {
-                Logger::logSecurityEvent('User profile updated', [
-                    'updated_user_id' => $id,
-                    'updated_by' => $currentUserId,
-                    'fields' => array_keys($data)
-                ]);
-
                 // Get updated user data
                 $updatedUser = User::findById($id);
                 $userData = $updatedUser->toArray();
                 unset($userData['password']);
 
-                $this->response->success('User profile updated successfully', $userData);
+                $this->response->success($userData, 'User profile updated successfully');
             } else {
                 $this->response->error('Failed to update user profile', 500);
             }
@@ -235,11 +206,6 @@ class UserController
 
             // Check if current user is admin
             if ($currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized user deletion attempt', [
-                    'user_id' => $currentUser['id'],
-                    'target_user_id' => $id,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can delete users', 403);
                 return;
             }
@@ -260,14 +226,7 @@ class UserController
             // Delete user with cascade cleanup
             $result = User::deleteUserCascade($id);
 
-            if ($result) {
-                Logger::logSecurityEvent('User deleted with cascade cleanup', [
-                    'deleted_user_id' => $id,
-                    'deleted_user_email' => $userToDelete->getEmail(),
-                    'deleted_by' => $currentUser['id'],
-                    'ip' => Security::getRealIp()
-                ]);
-
+            if ($result) {                
                 $this->response->success('User deleted successfully');
             } else {
                 $this->response->error('Failed to delete user', 500);

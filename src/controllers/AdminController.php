@@ -91,7 +91,7 @@ class AdminController
             }
 
             // Get timeframe parameter
-            $timeframe = $this->request->query('timeframe', 'all');
+            $timeframe = $this->request->getQueryParameter('timeframe', 'all');
 
             // Validate timeframe
             $validTimeframes = ['day', 'week', 'month', 'all'];
@@ -178,11 +178,11 @@ class AdminController
             }
 
             // Get query parameters
-            $userId = $this->request->query('user_id');
-            $action = $this->request->query('action');
-            $entityType = $this->request->query('entity_type');
-            $page = (int) $this->request->query('page', 1);
-            $perPage = min((int) $this->request->query('per_page', 50), 100);
+            $userId = $this->request->getQueryParameter('user_id');
+            $action = $this->request->getQueryParameter('action');
+            $entityType = $this->request->getQueryParameter('entity_type');
+            $page = (int) $this->request->getQueryParameter('page', 1);
+            $perPage = min((int) $this->request->getQueryParameter('per_page', 50), 100);
 
             // Get audit log data
             $auditLogData = AdminDashboard::getAuditLog(
@@ -405,7 +405,7 @@ class AdminController
             }
 
             // Get timeframe parameter
-            $timeframe = $this->request->query('timeframe', 'all');
+            $timeframe = $this->request->getQueryParameter('timeframe', 'all');
 
             // Validate timeframe
             $validTimeframes = ['day', 'week', 'month', 'all'];
@@ -502,7 +502,7 @@ class AdminController
             }
 
             // Get older_than parameter
-            $olderThan = max((int) $this->request->query('older_than', 90), 30);
+            $olderThan = max((int) $this->request->getQueryParameter('older_than', 90), 30);
 
             // Validate older_than parameter
             if ($olderThan < 30) {
