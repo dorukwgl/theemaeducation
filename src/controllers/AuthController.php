@@ -5,6 +5,8 @@ namespace EMA\Controllers;
 use EMA\Services\AuthService;
 use EMA\Utils\Validator;
 use EMA\Utils\Logger;
+use EMA\Utils\ImageProcessor;
+use EMA\Config\Constants;
 use EMA\Core\Request;
 use EMA\Core\Response;
 
@@ -47,6 +49,22 @@ class AuthController
         try {
             $data = $this->request->allInput();
 
+            $imagePath = null;
+            if (isset($_FILES['profile_image']) && $_FILES['profile_image']['error'] === UPLOAD_ERR_OK) {
+                $imageResult = $this->processProfileImage($_FILES['profile_image']);
+
+                if (isset($imageResult['error'])) {
+                    $this->response->validationError(['profile_image' => $imageResult['error']], 'Profile image validation failed');
+                    return;
+                }
+
+                $imagePath = $imageResult['path'];
+            }
+
+            if ($imagePath) {
+                $data['image'] = $imagePath;
+            }
+
             $result = $this->authService->register($data);
 
             if ($result['success']) {
@@ -65,6 +83,51 @@ class AuthController
             ]);
             $this->response->error('Registration failed', 500);
         }
+    }
+
+    private function processProfileImage(array $file): array
+    {
+        $validationErrors = ImageProcessor::validateProfileImage($file);
+
+        if (!empty($validationErrors)) {
+            return ['error' => $validationErrors['profile_image']];
+        }
+
+        $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+
+        if (!in_array(strtolower($extension), ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mimeType = finfo_file($finfo, $file['tmp_name']);
+
+            $extensionMap = [
+                'image/jpeg' => 'jpg',
+                'image/png' => 'png',
+                'image/gif' => 'gif',
+                'image/webp' => 'webp'
+            ];
+
+            $extension = $extensionMap[$mimeType] ?? 'jpg';
+        }
+
+        $filename = bin2hex(random_bytes(16)) . '_' . time() . '.' . $extension;
+        $destination = Constants::PATH_PROFILE_IMAGES . '/' . $filename;
+
+        $result = ImageProcessor::processImage(
+            $file['tmp_name'],
+            $destination,
+            1200,
+            1200,
+            90
+        );
+
+        if (!$result) {
+            Logger::error('Failed to process profile image', [
+                'original_name' => $file['name']
+            ]);
+            return ['error' => 'Failed to process profile image'];
+        }
+
+        return ['path' => $destination];
     }
 
     public function logout(): void

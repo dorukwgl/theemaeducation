@@ -320,7 +320,6 @@ class Validator
 
         $fileInfo = finfo_open(FILEINFO_MIME_TYPE);
         $mimeType = finfo_file($fileInfo, $_FILES[$field]['tmp_name']);
-        finfo_close($fileInfo);
 
         if (!in_array($mimeType, \EMA\Config\Constants::ALLOWED_IMAGE_TYPES)) {
             $this->errors[$field][] = "The $field must be an image.";
@@ -335,7 +334,6 @@ class Validator
 
         $fileInfo = finfo_open(FILEINFO_MIME_TYPE);
         $mimeType = finfo_file($fileInfo, $_FILES[$field]['tmp_name']);
-        finfo_close($fileInfo);
 
         if (!in_array($mimeType, $allowedMimes)) {
             $this->errors[$field][] = "The $field has an invalid file type.";

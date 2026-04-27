@@ -5,6 +5,8 @@ namespace EMA\Models;
 use EMA\Utils\Validator;
 use EMA\Utils\Logger;
 use EMA\Utils\Security;
+use EMA\Utils\ImageProcessor;
+use EMA\Config\Constants;
 
 class Question
 {
@@ -169,89 +171,6 @@ class Question
                 'error' => $e->getMessage()
             ]);
             return [];
-        }
-    }
-
-    /**
-     * Create question
-     * @param array $data Question data with multimedia support
-     * @return int|false New question ID or false on failure
-     */
-    public static function create(array $data): int|false
-    {
-        try {
-            $query = "
-                SELECT q.id, q.quiz_set_id, q.question, q.optional_text,
-                       q.correct_answer, q.question_type, q.question_word_formatting,
-                       q.optional_word_formatting,
-                       choice_A_text, choice_A_file, choice_A_file_type, choice_A_file_mime,
-                       choice_B_text, choice_B_file, choice_B_file_type, choice_B_file_mime,
-                       choice_C_text, choice_C_file, choice_C_file_type, choice_C_file_mime,
-                       choice_D_text, choice_D_file, choice_D_file_type, choice_D_file_mime,
-                       qs.name as quiz_set_name, qs.access_type as quiz_set_access_type
-                FROM questions q
-                LEFT JOIN quiz_sets qs ON q.quiz_set_id = qs.id
-                WHERE q.id = ? LIMIT 1
-            ";
-
-            $stmt = \EMA\Config\Database::prepare($query);
-            $stmt->bind_param('i', $id);
-            $stmt->execute();
-            $result = $stmt->get_result();
-
-            if (!$result->num_rows) {
-                return null;
-            }
-
-            $question = $result->fetch_assoc();
-            $stmt->close();
-
-            $questionData = [
-                'id' => (int) $question['id'],
-                'quiz_set_id' => (int) $question['quiz_set_id'],
-                'question' => $question['question'],
-                'optional_text' => $question['optional_text'],
-                'correct_answer' => $question['correct_answer'],
-                'question_type' => $question['question_type'],
-                'question_word_formatting' => json_decode($question['question_word_formatting'], true),
-                'optional_word_formatting' => json_decode($question['optional_word_formatting'], true),
-                'choice_A' => [
-                    'text' => $question['choice_A_text'],
-                    'file' => $question['choice_A_file'],
-                    'file_type' => $question['choice_A_file_type'],
-                    'file_mime' => $question['choice_A_file_mime']
-                ],
-                'choice_B' => [
-                    'text' => $question['choice_B_text'],
-                    'file' => $question['choice_B_file'],
-                    'file_type' => $question['choice_B_file_type'],
-                    'file_mime' => $question['choice_B_file_mime']
-                ],
-                'choice_C' => [
-                    'text' => $question['choice_C_text'],
-                    'file' => $question['choice_C_file'],
-                    'file_type' => $question['choice_C_file_type'],
-                    'file_mime' => $question['choice_C_file_mime']
-                ],
-                'choice_D' => [
-                    'text' => $question['choice_D_text'],
-                    'file' => $question['choice_D_file'],
-                    'file_type' => $question['choice_D_file_type'],
-                    'file_mime' => $question['choice_D_file_mime']
-                ],
-                'quiz_set_name' => $question['quiz_set_name'],
-                'quiz_set_access_type' => $question['quiz_set_access_type']
-            ];
-
-            Logger::info('Question found by ID', ['question_id' => $id]);
-
-            return $questionData;
-        } catch (\Exception $e) {
-            Logger::error('Error finding question by ID', [
-                'question_id' => $id,
-                'error' => $e->getMessage()
-            ]);
-            return null;
         }
     }
 
@@ -801,34 +720,53 @@ class Question
 
             // Generate secure filename
             $secureFilename = 'question_' . time() . '_' . bin2hex(random_bytes(8)) . '.' . $extension;
-            $filePath = 'uploads/questions/' . $secureFilename;
+            $filePath = Constants::PATH_QUESTIONS . '/' . $secureFilename;
 
-            // Move file to uploads directory
-            $fullPath = ROOT_PATH . '/' . $filePath;
-            $uploadDir = dirname($fullPath);
+            // Determine if this is an image file
+            $imageMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+            $isImage = in_array($uploadedFile['type'], $imageMimeTypes);
 
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
-            }
+            // Process image files with compression, move others as-is
+            if ($isImage) {
+                $result['success'] = ImageProcessor::compressImage($uploadedFile['tmp_name'], $filePath, 100);
 
-            if (move_uploaded_file($uploadedFile['tmp_name'], $fullPath)) {
-                chmod($fullPath, 0644);
+                if ($result['success']) {
+                    $result['file_path'] = $filePath;
+                    $result['file_type'] = $extension;
+                    $result['file_mime'] = $uploadedFile['type'];
 
-                $result['success'] = true;
-                $result['file_path'] = $filePath;
-                $result['file_type'] = $extension;
-                $result['file_mime'] = $uploadedFile['type'];
-
-                Logger::info('Question file uploaded successfully', [
-                    'file_path' => $filePath,
-                    'file_type' => $extension,
-                    'file_mime' => $uploadedFile['type']
-                ]);
+                    Logger::info('Question image compressed and saved', [
+                        'file_path' => $filePath,
+                        'file_type' => $extension,
+                        'file_mime' => $uploadedFile['type']
+                    ]);
+                } else {
+                    Logger::error('Failed to compress question image', [
+                        'tmp_name' => $uploadedFile['tmp_name'],
+                        'destination' => $filePath
+                    ]);
+                }
             } else {
-                Logger::error('Failed to move uploaded question file', [
-                    'tmp_name' => $uploadedFile['tmp_name'],
-                    'destination' => $fullPath
-                ]);
+                // Move non-image files (audio, video) directly
+                if (move_uploaded_file($uploadedFile['tmp_name'], $filePath)) {
+                    chmod($filePath, 0644);
+
+                    $result['success'] = true;
+                    $result['file_path'] = $filePath;
+                    $result['file_type'] = $extension;
+                    $result['file_mime'] = $uploadedFile['type'];
+
+                    Logger::info('Question file uploaded successfully', [
+                        'file_path' => $filePath,
+                        'file_type' => $extension,
+                        'file_mime' => $uploadedFile['type']
+                    ]);
+                } else {
+                    Logger::error('Failed to move uploaded question file', [
+                        'tmp_name' => $uploadedFile['tmp_name'],
+                        'destination' => $filePath
+                    ]);
+                }
             }
 
             return $result;
@@ -890,36 +828,57 @@ class Question
 
             // Generate secure filename
             $secureFilename = 'choice_' . $choice . '_' . time() . '_' . bin2hex(random_bytes(8)) . '.' . $extension;
-            $filePath = 'uploads/choices/' . $secureFilename;
+            $filePath = Constants::PATH_CHOICES . '/' . $secureFilename;
 
-            // Move file to uploads directory
-            $fullPath = ROOT_PATH . '/' . $filePath;
-            $uploadDir = dirname($fullPath);
+            // Determine if this is an image file
+            $imageMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+            $isImage = in_array($uploadedFile['type'], $imageMimeTypes);
 
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
-            }
+            // Process image files with compression, move others as-is
+            if ($isImage) {
+                $result['success'] = ImageProcessor::compressImage($uploadedFile['tmp_name'], $filePath, 100);
 
-            if (move_uploaded_file($uploadedFile['tmp_name'], $fullPath)) {
-                chmod($fullPath, 0644);
+                if ($result['success']) {
+                    $result['file_path'] = $filePath;
+                    $result['file_type'] = $extension;
+                    $result['file_mime'] = $uploadedFile['type'];
 
-                $result['success'] = true;
-                $result['file_path'] = $filePath;
-                $result['file_type'] = $extension;
-                $result['file_mime'] = $uploadedFile['type'];
-
-                Logger::info('Choice file uploaded successfully', [
-                    'choice' => $choice,
-                    'file_path' => $filePath,
-                    'file_type' => $extension,
-                    'file_mime' => $uploadedFile['type']
-                ]);
+                    Logger::info('Choice image compressed and saved', [
+                        'choice' => $choice,
+                        'file_path' => $filePath,
+                        'file_type' => $extension,
+                        'file_mime' => $uploadedFile['type']
+                    ]);
+                } else {
+                    Logger::error('Failed to compress choice image', [
+                        'choice' => $choice,
+                        'tmp_name' => $uploadedFile['tmp_name'],
+                        'destination' => $filePath
+                    ]);
+                }
             } else {
-                Logger::error('Failed to move uploaded choice file', [
-                    'choice' => $choice,
-                    'tmp_name' => $uploadedFile['tmp_name'],
-                    'destination' => $fullPath
-                ]);
+                // Move non-image files (audio) directly
+                if (move_uploaded_file($uploadedFile['tmp_name'], $filePath)) {
+                    chmod($filePath, 0644);
+
+                    $result['success'] = true;
+                    $result['file_path'] = $filePath;
+                    $result['file_type'] = $extension;
+                    $result['file_mime'] = $uploadedFile['type'];
+
+                    Logger::info('Choice file uploaded successfully', [
+                        'choice' => $choice,
+                        'file_path' => $filePath,
+                        'file_type' => $extension,
+                        'file_mime' => $uploadedFile['type']
+                    ]);
+                } else {
+                    Logger::error('Failed to move uploaded choice file', [
+                        'choice' => $choice,
+                        'tmp_name' => $uploadedFile['tmp_name'],
+                        'destination' => $filePath
+                    ]);
+                }
             }
 
             return $result;

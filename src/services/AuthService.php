@@ -128,6 +128,7 @@ class AuthService
                 'email' => $data['email'],
                 'phone' => $data['phone'],
                 'password' => $data['password'],
+                'image' => $data['image'] ?? null,
                 'role' => 'user'
             ]);
 
@@ -135,6 +136,9 @@ class AuthService
             $_SESSION['user_email'] = $user->getEmail();
             $_SESSION['user_role'] = $user->getRole();
             $_SESSION['last_activity'] = time();
+            if ($user->getImage()) {
+                $_SESSION['user_image'] = $user->getImage();
+            }
 
             return [
                 'success' => true,

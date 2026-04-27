@@ -179,39 +179,38 @@ class User
         try {
             // Start transaction to prevent race conditions
             Database::beginTransaction();
-            
-            $hashedPassword = Security::hashPassword($data['password']);
 
-            $stmt = Database::prepare(
-                "INSERT INTO users (full_name, email, phone, password, role) VALUES (?, ?, ?, ?, ?)"
-            );
+            $hashedPassword = Security::hashPassword($data['password']);
 
             $role = $data['role'] ?? 'user';
 
-            $stmt->bind_param(
-                'sssss',
-                $data['full_name'],
-                $data['email'],
-                $data['phone'],
-                $hashedPassword,
-                $role
-            );
+            $fields = ['full_name', 'email', 'phone', 'password', 'role'];
+            $placeholders = ['?', '?', '?', '?', '?'];
+            $types = 'sssss';
+            $values = [$data['full_name'], $data['email'], $data['phone'], $hashedPassword, $role];
 
+            if (isset($data['image'])) {
+                $fields[] = 'image';
+                $placeholders[] = '?';
+                $types .= 's';
+                $values[] = $data['image'];
+            }
+
+            $sql = "INSERT INTO users (" . implode(', ', $fields) . ") VALUES (" . implode(', ', $placeholders) . ")";
+            $stmt = Database::prepare($sql);
+            $stmt->bind_param($types, ...$values);
             $stmt->execute();
 
-            // Get the ID immediately after insert within the same transaction
             $userId = Database::lastInsertId();
-            
-            // Create user object directly from input data + new ID
+
             $userData = $data;
             $userData['id'] = $userId;
             $userData['password'] = $hashedPassword;
             $userData['role'] = $role;
             $userData['created_at'] = date('Y-m-d H:i:s');
-            
-            // Commit transaction
+
             Database::commit();
-            
+
             return new self($userData);
         } catch (\Exception $e) {
             Database::rollback();

@@ -107,7 +107,9 @@ class Constants
     public const PATH_FILES = 'uploads/files';
     public const PATH_ICONS = 'uploads/icons';
     public const PATH_QUESTIONS = 'uploads/questions';
+    public const PATH_CHOICES = 'uploads/choices';
     public const PATH_NOTICES = 'uploads/notices';
+    public const PATH_PROFILE_IMAGES = 'uploads/profile_images';
 
     // Database Tables
     public const TABLE_USERS = 'users';
