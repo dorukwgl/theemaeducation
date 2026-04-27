@@ -636,7 +636,8 @@ class User
 
             $users = [];
             while ($row = $result->fetch_assoc()) {
-                $users[] = new self($row);
+                $user = new self($row);
+                $users[] = $user->toArray();
             }
 
             return [
