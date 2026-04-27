@@ -1,3 +1,5 @@
 vendor/
 graphify-out/
 .env
+storage/
+uploads/
