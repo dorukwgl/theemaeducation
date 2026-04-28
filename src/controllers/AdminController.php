@@ -37,10 +37,6 @@ class AdminController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized dashboard access attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can access dashboard', 403);
                 return;
             }
@@ -51,16 +47,11 @@ class AdminController
             // Generate system alerts
             $alerts = $this->generateSystemAlerts($dashboardData);
 
-            Logger::info('Admin dashboard accessed', [
-                'admin_id' => $currentUser['id'],
-                'ip' => Security::getRealIp()
-            ]);
-
-            $this->response->success('Admin dashboard data retrieved successfully', [
+            $this->response->success([
                 'overview' => $dashboardData,
                 'alerts' => $alerts,
                 'generated_at' => date('Y-m-d H:i:s')
-            ]);
+            ], 'Admin dashboard data retrieved successfully');
         } catch (\Exception $e) {
             Logger::error('Admin dashboard error', [
                 'error' => $e->getMessage(),
@@ -82,10 +73,6 @@ class AdminController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized user activity access attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can access user activity', 403);
                 return;
             }
@@ -102,14 +89,7 @@ class AdminController
 
             // Get user activity statistics
             $activityData = AdminDashboard::getUserActivityStats($timeframe);
-
-            Logger::info('Admin user activity accessed', [
-                'admin_id' => $currentUser['id'],
-                'timeframe' => $timeframe,
-                'ip' => Security::getRealIp()
-            ]);
-
-            $this->response->success('User activity statistics retrieved successfully', $activityData);
+            $this->response->success($activityData, 'User activity statistics retrieved successfully');
         } catch (\Exception $e) {
             Logger::error('User activity statistics error', [
                 'error' => $e->getMessage(),
@@ -131,10 +111,6 @@ class AdminController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized system health access attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can access system health', 403);
                 return;
             }
@@ -142,12 +118,7 @@ class AdminController
             // Get system health data
             $healthData = AdminDashboard::getSystemHealth();
 
-            Logger::info('Admin system health accessed', [
-                'admin_id' => $currentUser['id'],
-                'ip' => Security::getRealIp()
-            ]);
-
-            $this->response->success('System health data retrieved successfully', $healthData);
+            $this->response->success($healthData, 'System health data retrieved successfully');
         } catch (\Exception $e) {
             Logger::error('System health retrieval error', [
                 'error' => $e->getMessage(),
@@ -169,10 +140,6 @@ class AdminController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized audit log access attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can access audit log', 403);
                 return;
             }
@@ -193,13 +160,7 @@ class AdminController
                 $perPage
             );
 
-            Logger::info('Admin audit log accessed', [
-                'admin_id' => $currentUser['id'],
-                'filters' => ['user_id' => $userId, 'action' => $action, 'entity_type' => $entityType],
-                'ip' => Security::getRealIp()
-            ]);
-
-            $this->response->success('Audit log entries retrieved successfully', $auditLogData);
+            $this->response->success($auditLogData, 'Audit log entries retrieved successfully');
         } catch (\Exception $e) {
             Logger::error('Audit log retrieval error', [
                 'error' => $e->getMessage(),
@@ -221,10 +182,6 @@ class AdminController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized bulk operation creation attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can create bulk operations', 403);
                 return;
             }
@@ -258,12 +215,12 @@ class AdminController
             );
 
             if ($operationId) {
-                $this->response->success('Bulk operation created successfully', [
+                $this->response->success([
                     'operation_id' => $operationId,
                     'operation_type' => $operationType,
                     'target_type' => $targetType,
                     'total_items' => count($targetIds)
-                ]);
+                ], 'Bulk operation created successfully');
             } else {
                 $this->response->error('Failed to create bulk operation', 500);
             }
@@ -288,11 +245,6 @@ class AdminController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized bulk operation status access attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'operation_id' => $id,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can access bulk operation status', 403);
                 return;
             }
@@ -304,14 +256,7 @@ class AdminController
                 $this->response->error('Bulk operation not found', 404);
                 return;
             }
-
-            Logger::info('Admin bulk operation status accessed', [
-                'admin_id' => $currentUser['id'],
-                'operation_id' => $id,
-                'ip' => Security::getRealIp()
-            ]);
-
-            $this->response->success('Bulk operation status retrieved successfully', $operation);
+            $this->response->success($operation, 'Bulk operation status retrieved successfully');
         } catch (\Exception $e) {
             Logger::error('Bulk operation status retrieval error', [
                 'error' => $e->getMessage(),
@@ -334,11 +279,6 @@ class AdminController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized bulk operation cancellation attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'operation_id' => $id,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can cancel bulk operations', 403);
                 return;
             }
@@ -364,12 +304,6 @@ class AdminController
             $stmt->close();
 
             if ($result) {
-                Logger::logSecurityEvent('Bulk operation cancelled', [
-                    'admin_id' => $currentUser['id'],
-                    'operation_id' => $id,
-                    'ip' => Security::getRealIp()
-                ]);
-
                 $this->response->success('Bulk operation cancelled successfully');
             } else {
                 $this->response->error('Failed to cancel bulk operation', 500);
@@ -396,10 +330,6 @@ class AdminController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized analytics access attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can access analytics', 403);
                 return;
             }
@@ -417,13 +347,7 @@ class AdminController
             // Get system analytics
             $analyticsData = $this->systemMonitoringService->getSystemAnalytics($timeframe);
 
-            Logger::info('Admin analytics accessed', [
-                'admin_id' => $currentUser['id'],
-                'timeframe' => $timeframe,
-                'ip' => Security::getRealIp()
-            ]);
-
-            $this->response->success('System analytics retrieved successfully', $analyticsData);
+            $this->response->success($analyticsData, 'System analytics retrieved successfully');
         } catch (\Exception $e) {
             Logger::error('System analytics retrieval error', [
                 'error' => $e->getMessage(),
@@ -445,10 +369,6 @@ class AdminController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized health check attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can run health checks', 403);
                 return;
             }
@@ -460,18 +380,11 @@ class AdminController
             $issues = $this->identifyHealthIssues($healthCheckResults);
             $recommendations = $this->generateHealthRecommendations($healthCheckResults);
 
-            Logger::logSecurityEvent('Admin health check run', [
-                'admin_id' => $currentUser['id'],
-                'overall_score' => $healthCheckResults['overall_score'],
-                'overall_status' => $healthCheckResults['overall_status'],
-                'ip' => Security::getRealIp()
-            ]);
-
-            $this->response->success('Health check completed successfully', [
+            $this->response->success([
                 'health_check' => $healthCheckResults,
                 'issues' => $issues,
                 'recommendations' => $recommendations
-            ]);
+            ], 'Health check completed successfully');
         } catch (\Exception $e) {
             Logger::error('Health check error', [
                 'error' => $e->getMessage(),
@@ -493,10 +406,6 @@ class AdminController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized audit log cleanup attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can clear audit log', 403);
                 return;
             }
@@ -519,17 +428,10 @@ class AdminController
             $stmt->close();
 
             if ($result !== false) {
-                Logger::logSecurityEvent('Audit log cleanup', [
-                    'admin_id' => $currentUser['id'],
-                    'deleted_count' => $deletedCount,
-                    'older_than_days' => $olderThan,
-                    'ip' => Security::getRealIp()
-                ]);
-
-                $this->response->success('Audit log cleaned successfully', [
+                $this->response->success([
                     'deleted_count' => $deletedCount,
                     'older_than_days' => $olderThan
-                ]);
+                ], 'Audit log cleaned successfully');
             } else {
                 $this->response->error('Failed to clear audit log', 500);
             }
@@ -685,14 +587,10 @@ class AdminController
             // Get all admin users
             $admins = User::getAllAdmins();
 
-            Logger::info('Admin listing accessed', [
-                'admin_id' => AuthMiddleware::getCurrentUserId()
-            ]);
-
-            $this->response->success('Admin users retrieved successfully', [
+            $this->response->success([
                 'admins' => $admins,
                 'total' => count($admins)
-            ]);
+            ], 'Admin users retrieved successfully');
         } catch (\Exception $e) {
             Logger::error('Admin listing error', [
                 'error' => $e->getMessage(),
@@ -709,10 +607,6 @@ class AdminController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized admin grant attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can grant admin privileges', 403);
                 return;
             }
@@ -741,13 +635,6 @@ class AdminController
             // Check if email matches (if provided) for security
             if (isset($data['email'])) {
                 if ($user->getEmail() !== $data['email']) {
-                    Logger::logSecurityEvent('Admin grant email mismatch', [
-                        'target_user_id' => $userId,
-                        'provided_email' => $data['email'],
-                        'actual_email' => $user->getEmail(),
-                        'attempted_by' => $currentUser['id'],
-                        'ip' => Security::getRealIp()
-                    ]);
                     $this->response->error('Email does not match user', 400);
                     return;
                 }
@@ -767,8 +654,7 @@ class AdminController
                 $adminData = User::findById($userId);
                 $userData = $adminData->toArray();
                 unset($userData['password']);
-
-                $this->response->success('Admin privileges granted successfully', $userData);
+                $this->response->success($userData, 'Admin privileges granted successfully');
             } else {
                 $this->response->error('Failed to grant admin privileges', 500);
             }
@@ -781,20 +667,90 @@ class AdminController
         }
     }
 
+    public function revoke(): void
+    {
+        try {
+            $currentUser = AuthMiddleware::getCurrentUser();
+
+            // Check if current user is admin
+            if (!$currentUser || $currentUser['role'] !== 'admin') {
+                $this->response->error('Only admins can revoke admin privileges', 403);
+                return;
+            }
+
+            $data = $this->request->allInput();
+
+            // Validate input
+            $validation = Validator::make($data, [
+                'user_id' => 'required|integer'
+            ]);
+
+            if (!$validation->validate()) {
+                $this->response->validationError($validation->getErrors(), 'Validation failed');
+                return;
+            }
+
+            $userId = (int) $data['user_id'];
+
+            // Prevent self-demotion
+            if ($currentUser['id'] === $userId) {
+                $this->response->error('You cannot revoke your own admin privileges', 400);
+                return;
+            }
+
+            // Check if user exists
+            $user = User::findById($userId);
+            if (!$user) {
+                $this->response->error('User not found', 404);
+                return;
+            }
+
+            // Check if email matches (if provided) for security
+            if (isset($data['email'])) {
+                if ($user->getEmail() !== $data['email']) {
+                    $this->response->error('Email does not match user', 400);
+                    return;
+                }
+            }
+
+            // Check if user is actually an admin
+            if (!User::isAdminById($userId)) {
+                $this->response->error('User is not an admin', 400);
+                return;
+            }
+
+            // Revoke admin privileges
+            $result = User::revokeAdmin($userId);
+
+            if ($result) {
+                // Get updated user data
+                $userData = User::findById($userId);
+                $userArray = $userData->toArray();
+                unset($userArray['password']);
+
+                $this->response->success($userArray, 'Admin privileges revoked successfully');
+            } else {
+                $this->response->error('Failed to revoke admin privileges', 500);
+            }
+        } catch (\Exception $e) {
+            Logger::error('Admin revoke error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->response->error('Failed to revoke admin privileges', 500);
+        }
+    }
+
     public function list(): void
     {
         try {
             // Get all admin users with different response format
             $admins = User::getAllAdmins();
 
-            Logger::info('Admin list accessed (alternative format)', [
-                'admin_id' => AuthMiddleware::getCurrentUserId()
-            ]);
-
-            $this->response->success('All admin users listed', [
+            $this->response->success([
                 'total' => count($admins),
                 'admins' => $admins
-            ]);
+            ], 'All admin users listed');
         } catch (\Exception $e) {
             Logger::error('Admin list error', [
                 'error' => $e->getMessage(),
@@ -811,10 +767,6 @@ class AdminController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized password reset approval attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can approve password resets', 403);
                 return;
             }
@@ -864,14 +816,6 @@ class AdminController
             $result = $updateStmt->execute();
 
             if ($result) {
-                Logger::logSecurityEvent('Password reset ' . $action . 'ed', [
-                    'reset_id' => $resetId,
-                    'user_id' => $resetRequest['user_id'],
-                    'email' => $resetRequest['email'],
-                    'approved_by' => $currentUser['id'],
-                    'ip' => Security::getRealIp()
-                ]);
-
                 $message = $action === 'approve'
                     ? 'Password reset approved successfully'
                     : 'Password reset rejected successfully';

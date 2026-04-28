@@ -91,7 +91,7 @@ class Response
 
     public function validationError(array $errors, string $message = 'Validation failed'): void
     {
-        $this->error($message, 422, $errors);
+        $this->error($message, 400, $errors);
     }
 
     public function notFound(string $message = 'Resource not found'): void

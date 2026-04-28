@@ -69,6 +69,7 @@ $router->get('/api/files/{id}/download', [FileController::class, 'download'], [A
 
 // Admin routes
 $router->post('/api/admin/grant', [AdminController::class, 'grant'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
+$router->post('/api/admin/revoke', [AdminController::class, 'revoke'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
 $router->post('/api/admin/approve-reset', [AdminController::class, 'approveReset'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
 $router->get('/api/admin/dashboard', [AdminController::class, 'dashboard'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
 $router->get('/api/admin/user-activity', [AdminController::class, 'userActivity'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);

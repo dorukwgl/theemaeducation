@@ -113,12 +113,6 @@ class UserController
             $currentUser = AuthMiddleware::getCurrentUser();
             $currentUserId = $currentUser['id'] ?? null;
 
-            // Check access permissions
-            if (!$currentUser) {
-                $this->response->error('Authentication required', 401);
-                return;
-            }
-
             // Users can only update their own profile, admins can update any
             if ($currentUser['role'] !== 'admin' && $currentUserId !== $id) {
                 $this->response->error('You can only update your own profile', 403);
@@ -152,7 +146,7 @@ class UserController
                 if (User::isEmailExists($data['email'])) {
                     $existingUser = User::findByEmail($data['email']);
                     if ($existingUser->getId() !== $id) {
-                        $this->response->error('Email already in use', 422);
+                        $this->response->error('Email already in use', 409);
                         return;
                     }
                 }
@@ -164,7 +158,7 @@ class UserController
                     // Need to check if it's the current user's phone
                     $currentUserData = User::findById($id);
                     if ($currentUserData->getPhone() !== $data['phone']) {
-                        $this->response->error('Phone number already in use', 422);
+                        $this->response->error('Phone number already in use', 409);
                         return;
                     }
                 }
