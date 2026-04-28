@@ -298,7 +298,8 @@ class AdminDashboard
             ];
         } catch (\Exception $e) {
             Logger::error('User activity statistics error', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'timeframe' => $timeframe
             ]);
             throw $e;
         }
@@ -364,20 +365,24 @@ class AdminDashboard
         try {
             $conditions = [];
             $params = [];
+            $types = '';
 
             if ($userId !== null) {
                 $conditions[] = "al.user_id = ?";
                 $params[] = $userId;
+                $types .= 'i';
             }
 
             if ($action !== null) {
                 $conditions[] = "al.action LIKE ?";
                 $params[] = "%{$action}%";
+                $types .= 's';
             }
 
             if ($entityType !== null) {
                 $conditions[] = "al.entity_type = ?";
                 $params[] = $entityType;
+                $types .= 's';
             }
 
             $whereClause = !empty($conditions) ? "WHERE " . implode(" AND ", $conditions) : "";
@@ -385,10 +390,6 @@ class AdminDashboard
             // Get total count
             $countQuery = "SELECT COUNT(*) as total FROM audit_log al {$whereClause}";
             $stmt = \EMA\Config\Database::prepare($countQuery);
-            $types = '';
-            foreach ($params as $param) {
-                $types .= is_int($param) ? 'i' : 's';
-            }
             $stmt->bind_param($types, ...$params);
             $stmt->execute();
             $total = $stmt->get_result()->fetch_assoc()['total'];
@@ -406,10 +407,12 @@ class AdminDashboard
                       ORDER BY al.created_at DESC
                       LIMIT ? OFFSET ?";
 
+            $types .= 'ii';
+            $params[] = $perPage;
+            $params[] = $offset;
+
             $stmt = \EMA\Config\Database::prepare($query);
-            $paramTypes = $types . 'ii';
-            $allParams = array_merge($params, [$perPage, $offset]);
-            $stmt->bind_param($paramTypes, ...$allParams);
+            $stmt->bind_param($types, ...$params);
             $stmt->execute();
             $result = $stmt->get_result();
 
@@ -510,14 +513,14 @@ class AdminDashboard
     {
         switch ($timeframe) {
             case 'day':
-                return DATE_SUB(NOW(), INTERVAL 1 DAY);
+                return date('Y-m-d H:i:s', strtotime('-1 day'));
             case 'week':
-                return DATE_SUB(NOW(), INTERVAL 7 DAY);
+                return date('Y-m-d H:i:s', strtotime('-7 days'));
             case 'month':
-                return DATE_SUB(NOW(), INTERVAL 30 DAY);
+                return date('Y-m-d H:i:s', strtotime('-30 days'));
             case 'all':
             default:
-                return '1970-01-01';
+                return '1970-01-01 00:00:00';
         }
     }
 
