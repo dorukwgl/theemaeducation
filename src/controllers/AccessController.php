@@ -18,9 +18,14 @@ class AccessController
 
     public function __construct()
     {
-        $this->request = new Request();
+        // Request will be set by Router via setRequest()
         $this->response = new Response();
         $this->accessService = new AccessService();
+    }
+
+    public function setRequest(Request $request): void
+    {
+        $this->request = $request;
     }
 
     /**

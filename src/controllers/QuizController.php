@@ -12,11 +12,20 @@ use EMA\Core\Response;
 
 class QuizController
 {
+    private Request $request;
+    private Response $response;
     private $quizService;
 
     public function __construct()
     {
+        // Request will be set by Router via setRequest()
+        $this->response = new Response();
         $this->quizService = new QuizService();
+    }
+
+    public function setRequest(Request $request): void
+    {
+        $this->request = $request;
     }
 
     /**
@@ -27,12 +36,11 @@ class QuizController
     public function index(): void
     {
         try {
-            $request = new Request();
-            $page = (int) ($request->get('page', 1));
-            $perPage = (int) ($request->get('per_page', 20));
-            $folderId = $request->get('folder_id') ? (int) $request->get('folder_id') : null;
-            $includeQuestionCount = $request->get('include_question_count') === 'true';
-            $publishedOnly = $request->get('published_only') !== 'false';
+            $page = (int) ($this->request->getInput('page', 1));
+            $perPage = (int) ($this->request->getInput('per_page', 20));
+            $folderId = $this->request->getInput('folder_id') ? (int) $this->request->getInput('folder_id') : null;
+            $includeQuestionCount = $this->request->getInput('include_question_count') === 'true';
+            $publishedOnly = $this->request->getInput('published_only') !== 'false';
 
             // Validate pagination parameters
             if ($page < 1) $page = 1;
@@ -79,9 +87,8 @@ class QuizController
     {
         try {
             $userId = \EMA\Middleware\AuthMiddleware::getCurrentUserId();
-            $request = new Request();
-            $includeQuestions = $request->get('include_questions') === 'true';
-            $includeStats = $request->get('include_stats') === 'true';
+            $includeQuestions = $this->request->getInput('include_questions') === 'true';
+            $includeStats = $this->request->getInput('include_stats') === 'true';
 
             // Get quiz set details
             $quizSet = QuizSet::findById($id);
@@ -174,8 +181,7 @@ class QuizController
                 return;
             }
 
-            $request = new Request();
-            $data = $request->all();
+                        $data = $request->all();
 
             // Validate CSRF token
             if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
@@ -264,8 +270,7 @@ class QuizController
                 return;
             }
 
-            $request = new Request();
-            $data = $request->all();
+                        $data = $request->all();
 
             // Validate CSRF token
             if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
@@ -354,8 +359,7 @@ class QuizController
                 return;
             }
 
-            $request = new Request();
-            $data = $request->all();
+                        $data = $request->all();
 
             // Validate CSRF token
             if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
@@ -409,10 +413,9 @@ class QuizController
     {
         try {
             $userId = \EMA\Middleware\AuthMiddleware::getCurrentUserId();
-            $request = new Request();
-            $page = (int) ($request->get('page', 1));
-            $perPage = (int) ($request->get('per_page', 20));
-            $includeFiles = $request->get('include_files') === 'true';
+                        $page = (int) ($this->request->getInput('page', 1));
+            $perPage = (int) ($this->request->getInput('per_page', 20));
+            $includeFiles = $this->request->getInput('include_files') === 'true';
 
             // Validate pagination parameters
             if ($page < 1) $page = 1;
@@ -520,8 +523,7 @@ class QuizController
                 return;
             }
 
-            $request = new Request();
-            $data = $request->all();
+                        $data = $request->all();
             $data['quiz_set_id'] = $id;
 
             // Validate CSRF token
@@ -621,8 +623,7 @@ class QuizController
                 return;
             }
 
-            $request = new Request();
-            $data = $request->all();
+                        $data = $request->all();
 
             // Validate CSRF token
             if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
@@ -722,8 +723,7 @@ class QuizController
                 return;
             }
 
-            $request = new Request();
-            $data = $request->all();
+                        $data = $request->all();
 
             // Validate CSRF token
             if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
@@ -782,8 +782,7 @@ class QuizController
     {
         try {
             $userId = \EMA\Middleware\AuthMiddleware::getCurrentUserId();
-            $request = new Request();
-            $data = $request->all();
+                        $data = $request->all();
 
             // Check if quiz set exists
             $quizSet = QuizSet::findById($id);
@@ -900,8 +899,7 @@ class QuizController
     {
         try {
             $userId = \EMA\Middleware\AuthMiddleware::getCurrentUserId();
-            $request = new Request();
-            $data = $request->all();
+                        $data = $request->all();
 
             // Validate required fields
             if (!isset($data['attempt_id']) || !isset($data['answers']) || !is_array($data['answers'])) {
@@ -1033,8 +1031,7 @@ class QuizController
     {
         try {
             $userId = \EMA\Middleware\AuthMiddleware::getCurrentUserId();
-            $request = new Request();
-            $timeframe = $request->get('timeframe');
+                        $timeframe = $this->request->getInput('timeframe');
 
             // Check if quiz set exists
             $quizSet = QuizSet::findById($id);
@@ -1100,8 +1097,7 @@ class QuizController
     {
         try {
             $userId = \EMA\Middleware\AuthMiddleware::getCurrentUserId();
-            $request = new Request();
-            $data = $request->all();
+                        $data = $request->all();
 
             // Validate required fields
             if (!isset($data['quiz_set_ids']) || !is_array($data['quiz_set_ids'])) {

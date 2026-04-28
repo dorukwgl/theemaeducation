@@ -24,8 +24,7 @@ class Folder
                 ORDER BY f.id DESC
             ";
 
-            $stmt = \EMA\Config\Database::query($query);
-            $result = $stmt->get_result();
+            $result = \EMA\Config\Database::query($query);
 
             $folders = [];
             while ($row = $result->fetch_assoc()) {
@@ -36,10 +35,6 @@ class Folder
                     'file_count' => (int) $row['file_count']
                 ];
             }
-
-            $stmt->close();
-
-            Logger::info('All folders retrieved', ['count' => count($folders)]);
 
             return $folders;
         } catch (\Exception $e) {
@@ -87,7 +82,6 @@ class Folder
                 'file_count' => (int) $folder['file_count']
             ];
 
-            Logger::info('Folder found by ID', ['folder_id' => $id]);
 
             return $folderData;
         } catch (\Exception $e) {
@@ -109,7 +103,6 @@ class Folder
         try {
             // Validate required fields
             if (!isset($data['name']) || empty(trim($data['name']))) {
-                Logger::warning('Folder creation failed: Name is required');
                 return false;
             }
 
@@ -118,7 +111,6 @@ class Folder
 
             // Check if folder name already exists
             if (self::nameExists($name)) {
-                Logger::warning('Folder creation failed: Name already exists', ['name' => $name]);
                 return false;
             }
 
@@ -126,7 +118,6 @@ class Folder
             if ($iconPath) {
                 $iconPath = self::handleIconUpload($iconPath);
                 if (!$iconPath) {
-                    Logger::warning('Folder creation failed: Icon upload failed');
                     return false;
                 }
             }
@@ -139,13 +130,6 @@ class Folder
             if ($stmt->execute()) {
                 $folderId = $stmt->insert_id;
                 $stmt->close();
-
-                Logger::info('Folder created successfully', [
-                    'folder_id' => $folderId,
-                    'name' => $name,
-                    'icon_path' => $iconPath
-                ]);
-
                 return $folderId;
             }
 
@@ -173,7 +157,6 @@ class Folder
             // Check if folder exists
             $folder = self::findById($id);
             if (!$folder) {
-                Logger::warning('Folder update failed: Folder not found', ['folder_id' => $id]);
                 return false;
             }
 
@@ -187,10 +170,6 @@ class Folder
 
                 // Check name uniqueness (exclude current folder)
                 if ($newName !== $folder['name'] && self::nameExists($newName, $id)) {
-                    Logger::warning('Folder update failed: Name already exists', [
-                        'folder_id' => $id,
-                        'new_name' => $newName
-                    ]);
                     return false;
                 }
 
@@ -206,17 +185,12 @@ class Folder
                 // Delete old icon if exists
                 if ($folder['icon_path'] && file_exists(ROOT_PATH . '/' . $folder['icon_path'])) {
                     unlink(ROOT_PATH . '/' . $folder['icon_path']);
-                    Logger::info('Old folder icon deleted', [
-                        'folder_id' => $id,
-                        'old_icon_path' => $folder['icon_path']
-                    ]);
                 }
 
                 // Handle new icon upload
                 if ($iconPath) {
                     $iconPath = self::handleIconUpload($iconPath);
                     if (!$iconPath) {
-                        Logger::warning('Folder update failed: Icon upload failed');
                         return false;
                     }
                 }
@@ -227,7 +201,6 @@ class Folder
             }
 
             if (empty($updates)) {
-                Logger::warning('Folder update failed: No valid fields to update');
                 return false;
             }
 
@@ -241,12 +214,6 @@ class Folder
 
             if ($stmt->execute()) {
                 $stmt->close();
-
-                Logger::info('Folder updated successfully', [
-                    'folder_id' => $id,
-                    'updates' => array_keys($data)
-                ]);
-
                 return true;
             }
 
@@ -274,7 +241,6 @@ class Folder
             // Check if folder exists
             $folder = self::findById($id);
             if (!$folder) {
-                Logger::warning('Folder deletion failed: Folder not found', ['folder_id' => $id]);
                 return false;
             }
 
@@ -323,7 +289,6 @@ class Folder
                 // Delete folder icon file if exists
                 if ($folder['icon_path'] && file_exists(ROOT_PATH . '/' . $folder['icon_path'])) {
                     unlink(ROOT_PATH . '/' . $folder['icon_path']);
-                    Logger::info('Folder icon deleted', ['icon_path' => $folder['icon_path']]);
                 }
 
                 // Delete folder record
@@ -335,12 +300,6 @@ class Folder
 
                 if ($result) {
                     \EMA\Config\Database::commit();
-
-                    Logger::info('Folder deleted successfully with cascade', [
-                        'folder_id' => $id,
-                        'name' => $folder['name']
-                    ]);
-
                     return true;
                 }
 
@@ -369,7 +328,6 @@ class Folder
         try {
             // Check if folder exists
             if (!self::findById($folderId)) {
-                Logger::warning('Folder contents failed: Folder not found', ['folder_id' => $folderId]);
                 return [];
             }
 
@@ -401,11 +359,6 @@ class Folder
             }
 
             $stmt->close();
-
-            Logger::info('Folder contents retrieved', [
-                'folder_id' => $folderId,
-                'file_count' => count($files)
-            ]);
 
             return $files;
         } catch (\Exception $e) {
@@ -474,7 +427,6 @@ class Folder
 
                 // Validate icon file
                 if (!in_array(strtolower($extension), ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
-                    Logger::warning('Invalid icon file type', ['extension' => $extension]);
                     return false;
                 }
 
@@ -499,8 +451,6 @@ class Folder
 
                 // Set file permissions
                 chmod($fullPath, 0644);
-
-                Logger::info('Icon uploaded successfully', ['path' => $iconPath]);
 
                 return $iconPath;
             }
@@ -597,12 +547,6 @@ class Folder
 
             $stmt->close();
 
-            Logger::info('Folder hierarchy retrieved', [
-                'folder_id' => $folderId,
-                'user_id' => $userId,
-                'folder_count' => count($folders)
-            ]);
-
             return $folders;
         } catch (\Exception $e) {
             Logger::error('Error getting folder hierarchy', [
@@ -686,12 +630,6 @@ class Folder
             }
 
             $stmt->close();
-
-            Logger::info('User folders retrieved', [
-                'user_id' => $userId,
-                'access_level' => $accessLevel,
-                'folder_count' => count($folders)
-            ]);
 
             return $folders;
         } catch (\Exception $e) {
@@ -786,12 +724,6 @@ class Folder
 
             $stmt->close();
 
-            Logger::info('Folder search completed', [
-                'query' => $query,
-                'user_id' => $userId,
-                'results_count' => count($folders)
-            ]);
-
             return $folders;
         } catch (\Exception $e) {
             Logger::error('Error searching folders', [
@@ -871,8 +803,6 @@ class Folder
                 'created_at' => $stats['created_by']
             ];
 
-            Logger::info('Folder statistics retrieved', ['folder_id' => $folderId]);
-
             return $statistics;
         } catch (\Exception $e) {
             Logger::error('Error getting folder statistics', [
@@ -926,12 +856,6 @@ class Folder
 
             $stmt->close();
 
-            Logger::info('Recent folders retrieved', [
-                'user_id' => $userId,
-                'limit' => $limit,
-                'folder_count' => count($folders)
-            ]);
-
             return $folders;
         } catch (\Exception $e) {
             Logger::error('Error getting recent folders', [
@@ -982,12 +906,6 @@ class Folder
             }
 
             $stmt->close();
-
-            Logger::info('Favorite folders retrieved', [
-                'user_id' => $userId,
-                'folder_count' => count($folders)
-            ]);
-
             return $folders;
         } catch (\Exception $e) {
             Logger::error('Error getting favorite folders', [
@@ -1008,7 +926,6 @@ class Folder
         try {
             // Validate required fields
             if (!isset($data['name']) || empty(trim($data['name']))) {
-                Logger::warning('Folder creation failed: Name is required');
                 return false;
             }
 
@@ -1022,26 +939,17 @@ class Folder
             if ($parentId !== null) {
                 $parentFolder = self::findById($parentId);
                 if (!$parentFolder) {
-                    Logger::warning('Folder creation failed: Parent folder not found', ['parent_id' => $parentId]);
                     return false;
                 }
 
                 // Check for circular references
                 if (self::isCircularReference($name, $parentId)) {
-                    Logger::warning('Folder creation failed: Circular reference detected', [
-                        'name' => $name,
-                        'parent_id' => $parentId
-                    ]);
                     return false;
                 }
             }
 
             // Check if folder name already exists at same level
             if (self::nameExistsAtLevel($name, $parentId)) {
-                Logger::warning('Folder creation failed: Name already exists at this level', [
-                    'name' => $name,
-                    'parent_id' => $parentId
-                ]);
                 return false;
             }
 
@@ -1049,7 +957,6 @@ class Folder
             if ($iconPath) {
                 $iconPath = self::handleIconUpload($iconPath);
                 if (!$iconPath) {
-                    Logger::warning('Folder creation failed: Icon upload failed');
                     return false;
                 }
             }
@@ -1064,15 +971,6 @@ class Folder
             if ($stmt->execute()) {
                 $folderId = $stmt->insert_id;
                 $stmt->close();
-
-                Logger::info('Folder created with parent', [
-                    'folder_id' => $folderId,
-                    'name' => $name,
-                    'parent_id' => $parentId,
-                    'access_type' => $accessType,
-                    'sort_order' => $sortOrder,
-                    'created_by' => $createdBy
-                ]);
 
                 return $folderId;
             }
@@ -1102,23 +1000,17 @@ class Folder
             // Validate both folders exist
             $folder = self::findById($folderId);
             if (!$folder) {
-                Logger::warning('Folder move failed: Source folder not found', ['folder_id' => $folderId]);
                 return false;
             }
 
             if ($newParentId !== null) {
                 $newParent = self::findById($newParentId);
                 if (!$newParent) {
-                    Logger::warning('Folder move failed: Destination folder not found', ['folder_id' => $newParentId]);
                     return false;
                 }
 
                 // Check for circular references
                 if (self::isCircularReference($folder['name'], $newParentId, $folderId)) {
-                    Logger::warning('Folder move failed: Circular reference detected', [
-                        'folder_id' => $folderId,
-                        'new_parent_id' => $newParentId
-                    ]);
                     return false;
                 }
             }
@@ -1151,13 +1043,6 @@ class Folder
 
                 if ($stmt->execute()) {
                     \EMA\Config\Database::commit();
-
-                    Logger::info('Folder moved successfully', [
-                        'folder_id' => $folderId,
-                        'new_parent_id' => $newParentId,
-                        'new_sort_order' => $newSortOrder
-                    ]);
-
                     return true;
                 }
 
@@ -1191,14 +1076,12 @@ class Folder
             // Validate folder exists
             $folder = self::findById($folderId);
             if (!$folder) {
-                Logger::warning('Folder access grant failed: Folder not found', ['folder_id' => $folderId]);
                 return false;
             }
 
             // Validate user exists
             $user = \EMA\Models\User::findById($userId);
             if (!$user) {
-                Logger::warning('Folder access grant failed: User not found', ['user_id' => $userId]);
                 return false;
             }
 
@@ -1218,10 +1101,6 @@ class Folder
             $stmt->close();
 
             if ($existingCount > 0) {
-                Logger::warning('Folder access grant failed: Access already exists', [
-                    'folder_id' => $folderId,
-                    'user_id' => $userId
-                ]);
                 return false;
             }
 
@@ -1232,15 +1111,6 @@ class Folder
 
             if ($stmt->execute()) {
                 $stmt->close();
-
-                Logger::logSecurityEvent('Folder access granted', [
-                    'admin_id' => $grantedBy,
-                    'folder_id' => $folderId,
-                    'user_id' => $userId,
-                    'access_level' => $accessLevel,
-                    'ip' => \EMA\Utils\Security::getRealIp()
-                ]);
-
                 return true;
             }
 
@@ -1269,14 +1139,12 @@ class Folder
             // Validate folder exists
             $folder = self::findById($folderId);
             if (!$folder) {
-                Logger::warning('Folder access revoke failed: Folder not found', ['folder_id' => $folderId]);
                 return false;
             }
 
             // Validate user exists
             $user = \EMA\Models\User::findById($userId);
             if (!$user) {
-                Logger::warning('Folder access revoke failed: User not found', ['user_id' => $userId]);
                 return false;
             }
 
@@ -1314,13 +1182,6 @@ class Folder
                         $updateStmt->close();
                     }
                 }
-
-                Logger::logSecurityEvent('Folder access revoked', [
-                    'folder_id' => $folderId,
-                    'user_id' => $userId,
-                    'ip' => \EMA\Utils\Security::getRealIp()
-                ]);
-
                 return true;
             }
 
@@ -1344,13 +1205,12 @@ class Folder
      * @param string|null $details Optional JSON details
      * @return bool true if successful, false otherwise
      */
-    public static function logFolderActivity(int $folderId, ?int $userId = null, string $action, ?string $details = null): bool
+    public static function logFolderActivity(int $folderId, string $action, ?int $userId = null, ?string $details = null): bool
     {
         try {
             // Validate folder exists
             $folder = self::findById($folderId);
             if (!$folder) {
-                Logger::warning('Folder activity log failed: Folder not found', ['folder_id' => $folderId]);
                 return false;
             }
 
@@ -1358,7 +1218,6 @@ class Folder
             if ($userId !== null) {
                 $user = \EMA\Models\User::findById($userId);
                 if (!$user) {
-                    Logger::warning('Folder activity log failed: User not found', ['user_id' => $userId]);
                     return false;
                 }
             }
@@ -1366,10 +1225,6 @@ class Folder
             // Validate action
             $validActions = ['view', 'create', 'update', 'delete', 'move', 'share', 'access_granted', 'access_revoked'];
             if (!in_array($action, $validActions)) {
-                Logger::warning('Folder activity log failed: Invalid action', [
-                    'folder_id' => $folderId,
-                    'action' => $action
-                ]);
                 return false;
             }
 
@@ -1383,13 +1238,6 @@ class Folder
 
             if ($stmt->execute()) {
                 $stmt->close();
-
-                Logger::info('Folder activity logged', [
-                    'folder_id' => $folderId,
-                    'user_id' => $userId,
-                    'action' => $action,
-                    'ip_address' => $ipAddress
-                ]);
 
                 return true;
             }
@@ -1417,19 +1265,16 @@ class Folder
         try {
             // Validate folder_ids array
             if (empty($folderIds)) {
-                Logger::warning('Batch folder delete failed: Empty folder IDs array');
                 return ['success_count' => 0, 'failure_count' => 0, 'errors' => []];
             }
 
             if (count($folderIds) > 100) {
-                Logger::warning('Batch folder delete failed: Too many folders', ['count' => count($folderIds)]);
                 return ['success_count' => 0, 'failure_count' => count($folderIds), 'errors' => ['Maximum 100 folders per batch']];
             }
 
             // Validate user permissions for each folder
             $currentUser = \EMA\Middleware\AuthMiddleware::getCurrentUser();
             if (!$currentUser) {
-                Logger::warning('Batch folder delete failed: Authentication required');
                 return ['success_count' => 0, 'failure_count' => count($folderIds), 'errors' => ['Authentication required']];
             }
 
@@ -1477,13 +1322,6 @@ class Folder
 
             // Commit transaction
             \EMA\Config\Database::commit();
-
-            Logger::info('Batch folder delete completed', [
-                'user_id' => $userId,
-                'is_admin' => $isAdmin,
-                'success_count' => $successCount,
-                'failure_count' => $failureCount
-            ]);
 
             return [
                 'success_count' => $successCount,

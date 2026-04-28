@@ -11,11 +11,20 @@ use EMA\Core\Response;
 
 class NoticeController
 {
+    private Request $request;
+    private Response $response;
     private $noticeService;
 
     public function __construct()
     {
+        // Request will be set by Router via setRequest()
+        $this->response = new Response();
         $this->noticeService = new NoticeService();
+    }
+
+    public function setRequest(Request $request): void
+    {
+        $this->request = $request;
     }
 
     /**
@@ -26,28 +35,27 @@ class NoticeController
     public function index(): void
     {
         try {
-            $request = new Request();
-            $userId = \EMA\Middleware\AuthMiddleware::getCurrentUserId(); // Can be null for unauthenticated users
-            $page = (int) ($request->get('page', 1));
-            $perPage = (int) ($request->get('per_page', 20));
+                        $userId = \EMA\Middleware\AuthMiddleware::getCurrentUserId(); // Can be null for unauthenticated users
+            $page = (int) ($this->request->getInput('page', 1));
+            $perPage = (int) ($this->request->getInput('per_page', 20));
 
             // Build filters
             $filters = [];
 
-            if ($request->get('notice_type')) {
-                $filters['notice_type'] = $request->get('notice_type');
+            if ($this->request->getInput('notice_type')) {
+                $filters['notice_type'] = $this->request->getInput('notice_type');
             }
 
-            if ($request->get('priority')) {
-                $filters['priority'] = $request->get('priority');
+            if ($this->request->getInput('priority')) {
+                $filters['priority'] = $this->request->getInput('priority');
             }
 
-            if ($request->get('active_only') === 'true') {
+            if ($this->request->getInput('active_only') === 'true') {
                 $filters['active_only'] = true;
             }
 
-            if ($request->get('target_audience')) {
-                $filters['target_audience'] = $request->get('target_audience');
+            if ($this->request->getInput('target_audience')) {
+                $filters['target_audience'] = $this->request->getInput('target_audience');
             }
 
             if ($userId) {
@@ -171,8 +179,7 @@ class NoticeController
                 return;
             }
 
-            $request = new Request();
-            $data = $request->all();
+                        $data = $request->all();
 
             // Validate CSRF token
             if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
@@ -287,8 +294,7 @@ class NoticeController
                 return;
             }
 
-            $request = new Request();
-            $data = $request->all();
+                        $data = $request->all();
 
             // Validate CSRF token
             if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
@@ -377,8 +383,7 @@ class NoticeController
                 return;
             }
 
-            $request = new Request();
-            $data = $request->all();
+                        $data = $request->all();
 
             // Validate CSRF token
             if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
@@ -450,8 +455,7 @@ class NoticeController
                 return;
             }
 
-            $request = new Request();
-            $data = $request->all();
+                        $data = $request->all();
 
             // Validate CSRF token
             if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
@@ -546,8 +550,7 @@ class NoticeController
                 return;
             }
 
-            $request = new Request();
-            $data = $request->all();
+                        $data = $request->all();
 
             // Validate CSRF token
             if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
@@ -682,8 +685,7 @@ class NoticeController
                 return;
             }
 
-            $request = new Request();
-            $data = $request->all();
+                        $data = $request->all();
 
             // Validate CSRF token
             if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
@@ -856,8 +858,7 @@ class NoticeController
                 return;
             }
 
-            $request = new Request();
-            $data = $request->all();
+                        $data = $request->all();
 
             // Validate CSRF token
             if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {

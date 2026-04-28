@@ -19,8 +19,13 @@ class FolderController
 
     public function __construct()
     {
-        $this->request = new Request();
+        // Request will be set by Router via setRequest()
         $this->response = new Response();
+    }
+
+    public function setRequest(Request $request): void
+    {
+        $this->request = $request;
     }
 
     /**
@@ -41,14 +46,10 @@ class FolderController
             // Get all folders
             $folders = Folder::getAllFolders();
 
-            Logger::info('Folder listing accessed', [
-                'user_id' => $currentUser['id']
-            ]);
-
-            $this->response->success('Folders retrieved successfully', [
+            $this->response->success([
                 'folders' => $folders,
                 'total' => count($folders)
-            ]);
+            ], 'Folders retrieved successfully');
         } catch (\Exception $e) {
             Logger::error('Folder listing error', [
                 'error' => $e->getMessage(),
@@ -69,10 +70,6 @@ class FolderController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized folder creation attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can create folders', 403);
                 return;
             }
@@ -120,17 +117,10 @@ class FolderController
             if ($folderId) {
                 $folder = Folder::findById($folderId);
 
-                Logger::logSecurityEvent('Folder created', [
-                    'admin_id' => $currentUser['id'],
-                    'folder_id' => $folderId,
-                    'folder_name' => $data['name'],
-                    'ip' => Security::getRealIp()
-                ]);
-
-                $this->response->success('Folder created successfully', [
+                $this->response->success([
                     'folder' => $folder,
                     'id' => $folderId
-                ]);
+                ],'Folder created successfully');
             } else {
                 $this->response->error('Failed to create folder', 500);
             }
@@ -167,7 +157,7 @@ class FolderController
             }
 
             // Check if contents should be included
-            $includeContents = filter_var($this->request->getQueryParam('include_contents', 'false'), FILTER_VALIDATE_BOOLEAN);
+            $includeContents = filter_var($this->request->getQueryParameter('include_contents', 'false'), FILTER_VALIDATE_BOOLEAN);
             $contents = [];
             $accessibleFiles = 0;
 
@@ -211,13 +201,7 @@ class FolderController
                 $responseData['total_files'] = count($contents);
             }
 
-            Logger::info('Folder details accessed', [
-                'user_id' => $currentUser['id'],
-                'folder_id' => $id,
-                'include_contents' => $includeContents
-            ]);
-
-            $this->response->success('Folder details retrieved successfully', $responseData);
+            $this->response->success($responseData, 'Folder details retrieved successfully');
         } catch (\Exception $e) {
             Logger::error('Folder details error', [
                 'folder_id' => $id,
@@ -239,11 +223,6 @@ class FolderController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized folder update attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'folder_id' => $id,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can update folders', 403);
                 return;
             }
@@ -289,15 +268,7 @@ class FolderController
 
             if ($result) {
                 $folder = Folder::findById($id);
-
-                Logger::logSecurityEvent('Folder updated', [
-                    'admin_id' => $currentUser['id'],
-                    'folder_id' => $id,
-                    'updates' => array_keys($data),
-                    'ip' => Security::getRealIp()
-                ]);
-
-                $this->response->success('Folder updated successfully', $folder);
+                $this->response->success($folder, 'Folder updated successfully');
             } else {
                 $this->response->error('Failed to update folder', 500);
             }
@@ -322,11 +293,6 @@ class FolderController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized folder deletion attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'folder_id' => $id,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can delete folders', 403);
                 return;
             }
@@ -349,13 +315,6 @@ class FolderController
             $result = Folder::delete($id);
 
             if ($result) {
-                Logger::logSecurityEvent('Folder deleted with cascade', [
-                    'admin_id' => $currentUser['id'],
-                    'folder_id' => $id,
-                    'folder_name' => $folder['name'],
-                    'ip' => Security::getRealIp()
-                ]);
-
                 $this->response->success('Folder deleted successfully');
             } else {
                 $this->response->error('Failed to delete folder', 500);
@@ -392,14 +351,12 @@ class FolderController
             // Check file size (max 2MB for icons)
             $maxIconSize = \EMA\Config\Config::get('upload.max_icon_size', 2097152); // 2MB default
             if ($iconData['size'] > $maxIconSize) {
-                Logger::warning('Icon file too large', ['size' => $iconData['size']]);
                 return false;
             }
 
             // Validate MIME type
             $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
             if (!in_array($iconData['type'], $allowedMimeTypes)) {
-                Logger::warning('Invalid icon MIME type', ['type' => $iconData['type']]);
                 return false;
             }
 
@@ -407,7 +364,6 @@ class FolderController
             $extension = strtolower(pathinfo($iconData['name'], PATHINFO_EXTENSION));
             $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
             if (!in_array($extension, $allowedExtensions)) {
-                Logger::warning('Invalid icon extension', ['extension' => $extension]);
                 return false;
             }
 

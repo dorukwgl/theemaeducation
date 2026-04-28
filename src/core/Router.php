@@ -75,7 +75,7 @@ class Router
         return '/^' . $pattern . '$/';
     }
 
-    public function dispatch(string $method, string $uri): void
+    public function dispatch(string $method, string $uri, Request $request): void
     {
         $method = strtoupper($method);
         $uri = parse_url($uri, PHP_URL_PATH);
@@ -89,7 +89,7 @@ class Router
             if (preg_match($route['pattern'], $uri, $matches)) {
                 $params = array_filter($matches, 'is_string', ARRAY_FILTER_USE_KEY);
 
-                $this->executeRoute($route, $params);
+                $this->executeRoute($route, $params, $request);
                 return;
             }
         }
@@ -97,15 +97,21 @@ class Router
         $this->handleNotFound();
     }
 
-    private function executeRoute(array $route, array $params): void
+    private function executeRoute(array $route, array $params, Request $request): void
     {
         $handler = $route['handler'];
         $middleware = array_merge($this->middleware, $route['middleware']);
 
-        $next = function () use ($handler, $params) {
+        $next = function () use ($handler, $params, $request) {
             if (is_array($handler)) {
                 [$controller, $method] = $handler;
                 $controllerInstance = new $controller();
+
+                // Set the request if controller has setRequest method
+                if (method_exists($controllerInstance, 'setRequest')) {
+                    $controllerInstance->setRequest($request);
+                }
+
                 return call_user_func_array([$controllerInstance, $method], array_values($params));
             } elseif (is_callable($handler)) {
                 return call_user_func_array($handler, array_values($params));

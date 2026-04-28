@@ -143,6 +143,11 @@ class RateLimitMiddleware
     private function getUserId(): ?string
     {
         if (session_status() === PHP_SESSION_NONE) {
+            // Only start session if there's a session cookie
+            // This prevents creating new empty sessions for rate limiting
+            if (!isset($_COOKIE['EMA_SESSION'])) {
+                return null;
+            }
             session_start();
         }
 

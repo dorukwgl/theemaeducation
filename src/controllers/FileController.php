@@ -19,8 +19,13 @@ class FileController
 
     public function __construct()
     {
-        $this->request = new Request();
+        // Request will be set by Router via setRequest()
         $this->response = new Response();
+    }
+
+    public function setRequest(Request $request): void
+    {
+        $this->request = $request;
     }
 
     /**
@@ -30,18 +35,6 @@ class FileController
     public function upload(): void
     {
         try {
-            $currentUser = AuthMiddleware::getCurrentUser();
-
-            // Check if current user is admin
-            if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized file upload attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'ip' => Security::getRealIp()
-                ]);
-                $this->response->error('Only admins can upload files', 403);
-                return;
-            }
-
             // Validate CSRF token
             $data = $this->request->allInput();
             if (!$this->validateCsrfToken($data)) {
@@ -98,10 +91,6 @@ class FileController
             }
 
             if (!move_uploaded_file($uploadedFile['tmp_name'], $fullPath)) {
-                Logger::error('Failed to move uploaded file', [
-                    'tmp_name' => $uploadedFile['tmp_name'],
-                    'destination' => $fullPath
-                ]);
                 $this->response->error('Failed to upload file', 500);
                 return;
             }
@@ -147,22 +136,7 @@ class FileController
             $fileId = File::create($fileData);
 
             if ($fileId) {
-                $file = File::findById($fileId);
-
-                Logger::logSecurityEvent('File uploaded', [
-                    'admin_id' => $currentUser['id'],
-                    'file_id' => $fileId,
-                    'folder_id' => $folderId,
-                    'file_name' => $fileData['name'],
-                    'file_size' => $uploadedFile['size'],
-                    'access_type' => $accessType,
-                    'ip' => Security::getRealIp()
-                ]);
-
-                $this->response->success('File uploaded successfully', [
-                    'file' => $file,
-                    'id' => $fileId
-                ]);
+                $this->response->success('File uploaded successfully');
             } else {
                 // Clean up uploaded files if database insert fails
                 unlink($fullPath);
@@ -172,68 +146,7 @@ class FileController
                 $this->response->error('Failed to create file record', 500);
             }
         } catch (\Exception $e) {
-            Logger::error('File upload error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
             $this->response->error('Failed to upload file', 500);
-        }
-    }
-
-    /**
-     * Get file details
-     * GET /api/files/{id}
-     */
-    public function show(int $id): void
-    {
-        try {
-            $currentUser = AuthMiddleware::getCurrentUser();
-
-            // Check authentication
-            if (!$currentUser) {
-                $this->response->error('Authentication required', 401);
-                return;
-            }
-
-            // Get file details
-            $file = File::findById($id);
-
-            if (!$file) {
-                $this->response->error('File not found', 404);
-                return;
-            }
-
-            // Check file access
-            if (!File::checkFileAccess($currentUser['id'], $id)) {
-                Logger::logSecurityEvent('Unauthorized file access attempt', [
-                    'user_id' => $currentUser['id'],
-                    'file_id' => $id,
-                    'ip' => Security::getRealIp()
-                ]);
-                $this->response->error('Access denied', 403);
-                return;
-            }
-
-            // Get file statistics
-            $stats = File::getFileStats($id);
-
-            Logger::info('File details accessed', [
-                'user_id' => $currentUser['id'],
-                'file_id' => $id
-            ]);
-
-            $this->response->success('File details retrieved successfully', [
-                'file' => $file,
-                'access_info' => $stats,
-                'can_access' => true
-            ]);
-        } catch (\Exception $e) {
-            Logger::error('File details error', [
-                'file_id' => $id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            $this->response->error('Failed to retrieve file details', 500);
         }
     }
 
@@ -244,19 +157,6 @@ class FileController
     public function delete(int $id): void
     {
         try {
-            $currentUser = AuthMiddleware::getCurrentUser();
-
-            // Check if current user is admin
-            if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized file deletion attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'file_id' => $id,
-                    'ip' => Security::getRealIp()
-                ]);
-                $this->response->error('Only admins can delete files', 403);
-                return;
-            }
-
             // Validate CSRF token
             $data = $this->request->allInput();
             if (!$this->validateCsrfToken($data)) {
@@ -275,24 +175,127 @@ class FileController
             $result = File::delete($id);
 
             if ($result) {
-                Logger::logSecurityEvent('File deleted with cascade', [
-                    'admin_id' => $currentUser['id'],
-                    'file_id' => $id,
-                    'file_name' => $file['name'],
-                    'ip' => Security::getRealIp()
-                ]);
-
                 $this->response->success('File deleted successfully');
             } else {
                 $this->response->error('Failed to delete file', 500);
             }
         } catch (\Exception $e) {
-            Logger::error('File deletion error', [
-                'file_id' => $id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
             $this->response->error('Failed to delete file', 500);
+        }
+    }
+
+    /**
+     * Serve file by path
+     * GET /api/files/{path}
+     */
+    public function serveByPath(string $path): void
+    {
+        try {
+            Logger::log('Serving file by path: ' . $path);
+            // Validate file path (prevent directory traversal)
+            $fullFilePath = ROOT_PATH . '/' . $path;
+            $realPath = realpath($fullFilePath);
+            $uploadsPath = realpath(ROOT_PATH . '/uploads/');
+
+            // Ensure path is within uploads directory
+            if (!$realPath || strpos($realPath, $uploadsPath) !== 0) {
+                $this->response->error('Invalid file path', 403);
+                return;
+            }
+
+            // Check if file exists
+            if (!file_exists($fullFilePath)) {
+                $this->response->error('File not found', 404);
+                return;
+            }
+
+            // Determine content type based on file extension
+            $extension = strtolower(pathinfo($fullFilePath, PATHINFO_EXTENSION));
+            $contentType = $this->getContentType($extension);
+
+            // Get file size
+            $fileSize = filesize($fullFilePath);
+
+            // Get filename for Content-Disposition
+            $filename = basename($fullFilePath);
+
+            // Set inline display headers
+            header('Content-Type: ' . $contentType);
+            header('Content-Disposition: inline; filename="' . $filename . '"');
+            header('Content-Length: ' . $fileSize);
+            header('Cache-Control: public, max-age=31536000'); // 1 year cache
+            header('Expires: ' . gmdate('D, d M Y H:i:s \G\M\T', time() + 31536000));
+
+            // Stream file to client
+            if ($fileHandle = fopen($fullFilePath, 'rb')) {
+                while (!feof($fileHandle)) {
+                    echo fread($fileHandle, 8192); // 8KB chunks
+                }
+                fclose($fileHandle);
+            } else {
+                $this->response->error('Failed to display file', 500);
+            }
+        } catch (\Exception $e) {
+            $this->response->error('Failed to display file', 500);
+        }
+    }
+
+    /**
+     * Display file inline (for images, videos, etc.)
+     * GET /api/files/{id}
+     */
+    public function show(int $id): void
+    {
+        try {
+            // Get file details
+            $file = File::findById($id);
+
+            if (!$file) {
+                $this->response->error('File not found', 404);
+                return;
+            }
+
+            // Validate file path (prevent directory traversal)
+            $fullFilePath = ROOT_PATH . '/' . $file['file_path'];
+            $realPath = realpath($fullFilePath);
+            $uploadsPath = realpath(ROOT_PATH . '/uploads/files/');
+
+            if (!$realPath || strpos($realPath, $uploadsPath) !== 0) {
+                $this->response->error('Invalid file path', 403);
+                return;
+            }
+
+            // Check if file exists
+            if (!file_exists($fullFilePath)) {
+                $this->response->error('File not found', 404);
+                return;
+            }
+
+            // Determine content type
+            $extension = strtolower(pathinfo($file['file_path'], PATHINFO_EXTENSION));
+            $contentType = $this->getContentType($extension);
+
+            // Get file size
+            $fileSize = filesize($fullFilePath);
+
+            // Set inline display headers (for images, videos, etc.)
+            header('Content-Type: ' . $contentType);
+            header('Content-Disposition: inline; filename="' . $file['name'] . '"');
+            header('Content-Length: ' . $fileSize);
+            header('Cache-Control: public, max-age=31536000'); // 1 year cache
+            header('Expires: ' . gmdate('D, d M Y H:i:s \G\M\T', time() + 31536000));
+
+            // Stream file to client
+            if ($fileHandle = fopen($fullFilePath, 'rb')) {
+                while (!feof($fileHandle)) {
+                    echo fread($fileHandle, 8192); // 8KB chunks
+                }
+                fclose($fileHandle);
+            } else {
+                $this->response->error('Failed to display file', 500);
+            }
+        } catch (\Exception $e) {
+            $this->response->error('Failed to display file', 500);
         }
     }
 
@@ -303,30 +306,11 @@ class FileController
     public function download(int $id): void
     {
         try {
-            $currentUser = AuthMiddleware::getCurrentUser();
-
-            // Check authentication
-            if (!$currentUser) {
-                $this->response->error('Authentication required', 401);
-                return;
-            }
-
             // Get file details
             $file = File::findById($id);
 
             if (!$file) {
                 $this->response->error('File not found', 404);
-                return;
-            }
-
-            // Check file access
-            if (!File::checkFileAccess($currentUser['id'], $id)) {
-                Logger::logSecurityEvent('Unauthorized file download attempt', [
-                    'user_id' => $currentUser['id'],
-                    'file_id' => $id,
-                    'ip' => Security::getRealIp()
-                ]);
-                $this->response->error('Access denied', 403);
                 return;
             }
 
@@ -336,34 +320,13 @@ class FileController
             $uploadsPath = realpath(ROOT_PATH . '/uploads/files/');
 
             if (!$realPath || strpos($realPath, $uploadsPath) !== 0) {
-                Logger::logSecurityEvent('File path traversal attempt', [
-                    'user_id' => $currentUser['id'],
-                    'file_id' => $id,
-                    'file_path' => $file['file_path'],
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Invalid file path', 403);
                 return;
             }
 
             // Check if file exists
             if (!file_exists($fullFilePath)) {
-                Logger::warning('File not found on disk', [
-                    'file_id' => $id,
-                    'file_path' => $fullFilePath
-                ]);
                 $this->response->error('File not found', 404);
-                return;
-            }
-
-            // Increment access count
-            $incrementResult = Access::incrementAccess($currentUser['id'], $id, 'file');
-            if (!$incrementResult) {
-                Logger::warning('File access limit reached', [
-                    'user_id' => $currentUser['id'],
-                    'file_id' => $id
-                ]);
-                $this->response->error('Access limit reached', 403);
                 return;
             }
 
@@ -391,26 +354,10 @@ class FileController
                     echo fread($fileHandle, 8192); // 8KB chunks
                 }
                 fclose($fileHandle);
-
-                Logger::info('File downloaded successfully', [
-                    'user_id' => $currentUser['id'],
-                    'file_id' => $id,
-                    'file_name' => $file['name'],
-                    'file_size' => $fileSize,
-                    'ip' => Security::getRealIp()
-                ]);
             } else {
-                Logger::error('Failed to open file for download', [
-                    'file_path' => $fullFilePath
-                ]);
                 $this->response->error('Failed to download file', 500);
             }
         } catch (\Exception $e) {
-            Logger::error('File download error', [
-                'file_id' => $id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
             $this->response->error('Failed to download file', 500);
         }
     }
@@ -442,10 +389,6 @@ class FileController
                 $maxSizeMB = round($maxFileSize / 1048576, 2);
                 $result['valid'] = false;
                 $result['message'] = "File size exceeds maximum allowed size of {$maxSizeMB}MB";
-                Logger::warning('File upload validation failed: File too large', [
-                    'size' => $uploadedFile['size'],
-                    'max_size' => $maxFileSize
-                ]);
                 return $result;
             }
 
@@ -464,9 +407,6 @@ class FileController
             if (!in_array($uploadedFile['type'], $allowedMimeTypes)) {
                 $result['valid'] = false;
                 $result['message'] = 'Invalid file type. Allowed types: JPEG, PNG, GIF, WebP, PDF, MP3, WAV, AAC, MP4, WebM';
-                Logger::warning('File upload validation failed: Invalid MIME type', [
-                    'type' => $uploadedFile['type']
-                ]);
                 return $result;
             }
 
@@ -477,9 +417,6 @@ class FileController
             if (!in_array($extension, $allowedExtensions)) {
                 $result['valid'] = false;
                 $result['message'] = 'Invalid file extension. Allowed extensions: jpg, jpeg, png, gif, webp, pdf, mp3, wav, aac, mp4, webm';
-                Logger::warning('File upload validation failed: Invalid extension', [
-                    'extension' => $extension
-                ]);
                 return $result;
             }
 
@@ -487,10 +424,6 @@ class FileController
 
             return $result;
         } catch (\Exception $e) {
-            Logger::error('Error validating file upload', [
-                'uploaded_file' => $uploadedFile,
-                'error' => $e->getMessage()
-            ]);
             return ['valid' => false, 'message' => 'File validation failed'];
         }
     }
@@ -510,10 +443,6 @@ class FileController
             if ($uploadedIcon['size'] > $maxIconSize) {
                 $result['valid'] = false;
                 $result['message'] = 'Icon file size exceeds maximum allowed size of 2MB';
-                Logger::warning('Icon upload validation failed: File too large', [
-                    'size' => $uploadedIcon['size'],
-                    'max_size' => $maxIconSize
-                ]);
                 return $result;
             }
 
@@ -522,9 +451,6 @@ class FileController
             if (!in_array($uploadedIcon['type'], $allowedMimeTypes)) {
                 $result['valid'] = false;
                 $result['message'] = 'Invalid icon file type. Only JPG, PNG, GIF, WebP allowed';
-                Logger::warning('Icon upload validation failed: Invalid MIME type', [
-                    'type' => $uploadedIcon['type']
-                ]);
                 return $result;
             }
 
@@ -535,9 +461,6 @@ class FileController
             if (!in_array($extension, $allowedExtensions)) {
                 $result['valid'] = false;
                 $result['message'] = 'Invalid icon extension. Allowed extensions: jpg, jpeg, png, gif, webp';
-                Logger::warning('Icon upload validation failed: Invalid extension', [
-                    'extension' => $extension
-                ]);
                 return $result;
             }
 
@@ -545,10 +468,6 @@ class FileController
 
             return $result;
         } catch (\Exception $e) {
-            Logger::error('Error validating icon upload', [
-                'uploaded_icon' => $uploadedIcon,
-                'error' => $e->getMessage()
-            ]);
             return ['valid' => false, 'message' => 'Icon validation failed'];
         }
     }

@@ -19,14 +19,26 @@ class AuthController
     public function __construct()
     {
         $this->authService = new AuthService();
-        $this->request = new Request();
+        // Request will be set by Router via setRequest()
         $this->response = new Response();
+    }
+
+    public function setRequest(Request $request): void
+    {
+        $this->request = $request;
     }
 
     public function login(): void
     {
         try {
             $data = $this->request->allInput();
+            
+            // Debug: Log what we received
+            Logger::log('Login request data received: ' . json_encode($data));
+            Logger::log('Request method: ' . $this->request->getMethod());
+            Logger::log('Request body: ' . $this->request->getBody());
+            Logger::log('POST data: ' . json_encode($_POST));
+            Logger::log('JSON data: ' . json_encode($this->request->allJsonParameters()));
 
             $result = $this->authService->login($data);
 

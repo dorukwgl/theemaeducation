@@ -67,7 +67,7 @@ class Config
             'session' => [
                 'driver' => $_ENV['SESSION_DRIVER'] ?? 'file',
                 'lifetime' => (int)($_ENV['SESSION_LIFETIME'] ?? 120),
-                'path' => $_ENV['SESSION_PATH'] ?? '/',
+                'path' => '/', // Always use root path for cookie availability on all routes
                 'domain' => $_ENV['SESSION_DOMAIN'] ?? '',
                 'secure' => filter_var($_ENV['SESSION_SECURE'] ?? 'false', FILTER_VALIDATE_BOOLEAN),
                 'http_only' => filter_var($_ENV['SESSION_HTTP_ONLY'] ?? 'true', FILTER_VALIDATE_BOOLEAN),

@@ -3,6 +3,7 @@
 namespace EMA\Middleware;
 
 use EMA\Core\Response;
+use EMA\Utils\Logger;
 
 class AuthMiddleware
 {
@@ -15,12 +16,18 @@ class AuthMiddleware
 
     public function handle($next)
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
+        Logger::log("AuthMiddleware: Session status before check: " . session_status());
+        Logger::log("AuthMiddleware: Cookie from request: " . json_encode($_COOKIE));
+
+        // Only log session details if session is active
+        if (session_status() !== PHP_SESSION_NONE) {
+            Logger::log("AuthMiddleware: Session ID: " . session_id());
+            Logger::log("AuthMiddleware: Session data: " . json_encode($_SESSION));
         }
 
         // Check if user is authenticated
         if (!$this->isAuthenticated()) {
+            Logger::log("AuthMiddleware: Authentication failed - Session data missing");
             $response = new Response();
             $response->unauthorized('Authentication required');
         }
@@ -46,6 +53,11 @@ class AuthMiddleware
 
     private function isAuthenticated(): bool
     {
+        Logger::log("AuthMiddleware: Checking authentication. Session keys present: " .
+                   (isset($_SESSION[\EMA\Config\Constants::SESSION_USER_ID]) ? 'user_id' : 'no user_id') . ", " .
+                   (isset($_SESSION[\EMA\Config\Constants::SESSION_USER_EMAIL]) ? 'user_email' : 'no user_email') . ", " .
+                   (isset($_SESSION[\EMA\Config\Constants::SESSION_USER_ROLE]) ? 'user_role' : 'no user_role'));
+
         return isset($_SESSION[\EMA\Config\Constants::SESSION_USER_ID]) &&
                isset($_SESSION[\EMA\Config\Constants::SESSION_USER_EMAIL]) &&
                isset($_SESSION[\EMA\Config\Constants::SESSION_USER_ROLE]);
@@ -85,6 +97,10 @@ class AuthMiddleware
     public static function getCurrentUserId(): ?int
     {
         if (session_status() === PHP_SESSION_NONE) {
+            // Only start session if there's a session cookie
+            if (!isset($_COOKIE['EMA_SESSION'])) {
+                return null;
+            }
             session_start();
         }
 
@@ -94,6 +110,10 @@ class AuthMiddleware
     public static function getCurrentUser(): ?array
     {
         if (session_status() === PHP_SESSION_NONE) {
+            // Only start session if there's a session cookie
+            if (!isset($_COOKIE['EMA_SESSION'])) {
+                return null;
+            }
             session_start();
         }
 

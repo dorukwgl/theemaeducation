@@ -20,9 +20,14 @@ class AdminController
 
     public function __construct()
     {
-        $this->request = new Request();
+        // Request will be set by Router via setRequest()
         $this->response = new Response();
         $this->systemMonitoringService = new SystemMonitoringService();
+    }
+
+    public function setRequest(Request $request): void
+    {
+        $this->request = $request;
     }
 
     /**

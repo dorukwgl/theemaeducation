@@ -22,17 +22,26 @@ class Request
     {
         $this->method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
         $this->uri = $_SERVER['REQUEST_URI'] ?? '/';
-        $this->headers = $this->parseHeaders();
+        $this->headers = $this->getAllHeaders();
         $this->query = $_GET;
         $this->post = $_POST;
         $this->files = $_FILES;
-        $this->body = file_get_contents('php://input');
+        $this->body = file_get_contents('php://input') ?? '';
+
+        // Debug: Log request details
+        Logger::log("Request: {$this->method} {$this->uri}");
+        Logger::log("Cookies: " . json_encode($_COOKIE));
+        Logger::log("Headers: " . json_encode([
+            'Cookie' => $this->headers['Cookie'] ?? 'none',
+            'User-Agent' => $this->headers['User-Agent'] ?? 'none'
+        ]));
+
         $this->json = $this->parseJson();
         $this->ip = $this->getClientIp();
         $this->userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
     }
 
-    private function parseHeaders(): array
+    private function getAllHeaders(): array
     {
         $headers = [];
         foreach ($_SERVER as $key => $value) {
@@ -45,11 +54,11 @@ class Request
     }
 
     private function parseJson(): array
-    {
+    { 
         if (!empty($this->body) && $this->isJson()) {
             $data = json_decode($this->body, true);
             if (json_last_error() === JSON_ERROR_NONE) {
-                return $data;
+                return $data ?? [];
             }
         }
         return [];

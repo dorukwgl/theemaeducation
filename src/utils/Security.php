@@ -10,6 +10,10 @@ class Security
     public static function generateCsrfToken(): string
     {
         if (session_status() === PHP_SESSION_NONE) {
+            // Only start session if there's a session cookie
+            if (!isset($_COOKIE['EMA_SESSION'])) {
+                throw new Exception('No active session to generate CSRF token');
+            }
             session_start();
         }
 
@@ -19,15 +23,19 @@ class Security
         return $token;
     }
 
-    public static function verifyCsrfToken(string $token): bool
+    public static function verifyCsrfToken(?string $token): bool
     {
         if (session_status() === PHP_SESSION_NONE) {
+            // Only start session if there's a session cookie
+            if (!isset($_COOKIE['EMA_SESSION'])) {
+                return false;
+            }
             session_start();
         }
 
         $sessionToken = $_SESSION[\EMA\Config\Constants::SESSION_CSRF_TOKEN] ?? null;
 
-        if ($sessionToken === null) {
+        if ($token === null || $sessionToken === null) {
             return false;
         }
 
@@ -41,6 +49,10 @@ class Security
     public static function getCsrfToken(): ?string
     {
         if (session_status() === PHP_SESSION_NONE) {
+            // Only start session if there's a session cookie
+            if (!isset($_COOKIE['EMA_SESSION'])) {
+                return null;
+            }
             session_start();
         }
 

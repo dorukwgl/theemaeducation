@@ -35,6 +35,25 @@ class App
         $this->setupSession();
     }
 
+    /**
+     * Check if current request allows session creation without existing cookie
+     * Authentication endpoints need to create new sessions
+     */
+    private function isAuthEndpoint(): bool
+    {
+        $uri = $this->request->getUri();
+        $path = $this->request->getPath();
+
+        $authEndpoints = [
+            '/api/auth/login',
+            '/api/auth/register',
+            '/api/auth/forgot-password',
+            '/api/auth/reset-password',
+        ];
+
+        return in_array($path, $authEndpoints);
+    }
+
     public function run(): void
     {
         try {
@@ -49,7 +68,8 @@ class App
             // Dispatch the request
             $this->router->dispatch(
                 $this->request->getMethod(),
-                $this->request->getUri()
+                $this->request->getUri(),
+                $this->request
             );
 
         } catch (Exception $e) {
@@ -95,11 +115,14 @@ class App
 
     private function setupSession(): void
     {
+        // Always configure session name, even if we don't start the session
+        // This ensures any session_start() call uses the correct cookie name
+        session_name('EMA_SESSION');
+
         if (session_status() === PHP_SESSION_NONE) {
             $sessionConfig = Config::get('session', []);
 
-            session_name('EMA_SESSION');
-
+            // Configure session parameters
             ini_set('session.cookie_lifetime', $sessionConfig['lifetime'] ?? 7200);
             ini_set('session.cookie_path', $sessionConfig['path'] ?? '/');
             ini_set('session.cookie_domain', $sessionConfig['domain'] ?? '');
@@ -111,6 +134,15 @@ class App
             ini_set('session.use_only_cookies', '1');
             ini_set('session.gc_maxlifetime', $sessionConfig['lifetime'] ?? 7200);
 
+            // Start session if:
+            // 1. Request has existing EMA_SESSION cookie (resume session)
+            // 2. OR it's an auth endpoint (create new session)
+            if (!isset($_COOKIE['EMA_SESSION']) && !$this->isAuthEndpoint()) {
+                Logger::log("App: No EMA_SESSION cookie and not auth endpoint, skipping session start");
+                return;
+            }
+
+            Logger::log("App: Starting session (auth endpoint: " . ($this->isAuthEndpoint() ? 'yes' : 'no') . ", has cookie: " . (isset($_COOKIE['EMA_SESSION']) ? 'yes' : 'no') . ")");
             session_start();
         }
     }

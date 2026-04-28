@@ -245,7 +245,7 @@ class User
                 return false;
             }
 
-            $fields[] = 'id = ?';
+            // Add ID parameter for WHERE clause
             $types .= 'i';
             $values[] = $id;
 
@@ -373,7 +373,7 @@ class User
             }
 
             // Check if user is already admin
-            if (self::isAdmin($userId)) {
+            if (self::isAdminById($userId)) {
                 return false;
             }
 
@@ -411,7 +411,7 @@ class User
     {
         try {
             // Check if user is admin
-            if (!self::isAdmin($userId)) {
+            if (!self::isAdminById($userId)) {
                 return false;
             }
 
