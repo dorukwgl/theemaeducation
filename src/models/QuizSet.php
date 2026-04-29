@@ -57,8 +57,6 @@ class QuizSet
                 'folder_icon_path' => $quizSet['folder_icon_path']
             ];
 
-            Logger::info('Quiz set found by ID', ['quiz_set_id' => $id]);
-
             return $quizSetData;
         } catch (\Exception $e) {
             Logger::error('Error finding quiz set by ID', [
@@ -79,7 +77,6 @@ class QuizSet
         try {
             // Validate required fields
             if (!isset($data['folder_id']) || !isset($data['name'])) {
-                Logger::warning('Quiz set creation failed: Missing required fields', ['data' => $data]);
                 return false;
             }
 
@@ -95,13 +92,11 @@ class QuizSet
             // Validate folder exists
             $folder = Folder::findById($folderId);
             if (!$folder) {
-                Logger::warning('Quiz set creation failed: Folder not found', ['folder_id' => $folderId]);
                 return false;
             }
 
             // Validate access_type
             if (!in_array($accessType, ['all', 'logged_in'])) {
-                Logger::warning('Quiz set creation failed: Invalid access type', ['access_type' => $accessType]);
                 return false;
             }
 
@@ -113,14 +108,6 @@ class QuizSet
             if ($stmt->execute()) {
                 $quizSetId = $stmt->insert_id;
                 $stmt->close();
-
-                Logger::info('Quiz set created successfully', [
-                    'quiz_set_id' => $quizSetId,
-                    'folder_id' => $folderId,
-                    'name' => $name,
-                    'access_type' => $accessType
-                ]);
-
                 return $quizSetId;
             }
 
@@ -148,7 +135,6 @@ class QuizSet
             // Check if quiz set exists
             $quizSet = self::findById($id);
             if (!$quizSet) {
-                Logger::warning('Quiz set update failed: Quiz set not found', ['quiz_set_id' => $id]);
                 return false;
             }
 
@@ -175,10 +161,6 @@ class QuizSet
                 // Delete old icon if exists
                 if ($quizSet['icon_path'] && file_exists(ROOT_PATH . '/' . $quizSet['icon_path'])) {
                     unlink(ROOT_PATH . '/' . $quizSet['icon_path']);
-                    Logger::info('Old quiz set icon deleted', [
-                        'quiz_set_id' => $id,
-                        'old_icon_path' => $quizSet['icon_path']
-                    ]);
                 }
 
                 $updates[] = 'icon_path = ?';
@@ -190,7 +172,6 @@ class QuizSet
             if (isset($data['access_type'])) {
                 $accessType = $data['access_type'];
                 if (!in_array($accessType, ['all', 'logged_in'])) {
-                    Logger::warning('Quiz set update failed: Invalid access type', ['access_type' => $accessType]);
                     return false;
                 }
 
@@ -221,7 +202,6 @@ class QuizSet
             }
 
             if (empty($updates)) {
-                Logger::warning('Quiz set update failed: No valid fields to update');
                 return false;
             }
 
@@ -235,11 +215,6 @@ class QuizSet
 
             if ($stmt->execute()) {
                 $stmt->close();
-
-                Logger::info('Quiz set updated successfully', [
-                    'quiz_set_id' => $id,
-                    'updates' => array_keys($data)
-                ]);
 
                 return true;
             }
@@ -268,7 +243,6 @@ class QuizSet
             // Check if quiz set exists
             $quizSet = self::findById($id);
             if (!$quizSet) {
-                Logger::warning('Quiz set deletion failed: Quiz set not found', ['quiz_set_id' => $id]);
                 return false;
             }
 
@@ -302,10 +276,6 @@ class QuizSet
                 // Delete icon file if exists
                 if ($quizSet['icon_path'] && file_exists(ROOT_PATH . '/' . $quizSet['icon_path'])) {
                     unlink(ROOT_PATH . '/' . $quizSet['icon_path']);
-                    Logger::info('Quiz set icon deleted', [
-                        'quiz_set_id' => $id,
-                        'icon_path' => $quizSet['icon_path']
-                    ]);
                 }
 
                 // Delete quiz set record
@@ -317,11 +287,6 @@ class QuizSet
 
                 if ($result) {
                     \EMA\Config\Database::commit();
-
-                    Logger::info('Quiz set deleted successfully', [
-                        'quiz_set_id' => $id,
-                        'name' => $quizSet['name']
-                    ]);
 
                     return true;
                 }
@@ -357,7 +322,6 @@ class QuizSet
             }
 
             if (!$quizSet['is_published']) {
-                Logger::warning('Quiz set not published', ['quiz_set_id' => $quizSetId]);
                 return [];
             }
 
@@ -429,11 +393,6 @@ class QuizSet
             }
 
             $stmt->close();
-
-            Logger::info('Quiz set questions retrieved', [
-                'quiz_set_id' => $quizSetId,
-                'question_count' => count($questions)
-            ]);
 
             return $questions;
         } catch (\Exception $e) {
@@ -617,15 +576,6 @@ class QuizSet
             $total = $countStmt->get_result()->fetch_assoc()['total'];
             $countStmt->close();
 
-            Logger::info('Quiz sets retrieved successfully', [
-                'page' => $page,
-                'per_page' => $perPage,
-                'total' => $total,
-                'count' => count($quizSets),
-                'user_id' => $userId,
-                'admin_access' => $userId === null || User::isAdminById($userId)
-            ]);
-
             return $quizSets;
         } catch (\Exception $e) {
             Logger::error('Error retrieving quiz sets', [
@@ -708,10 +658,6 @@ class QuizSet
                 'access_type' => $quizSet['access_type'],
                 'is_published' => $quizSet['is_published']
             ];
-
-            Logger::info('Quiz set statistics retrieved', [
-                'quiz_set_id' => $quizSetId
-            ]);
 
             return $statistics;
         } catch (\Exception $e) {

@@ -185,14 +185,30 @@ class FileController
         try {
             // URL-decode the path to handle special characters
             $path = urldecode($path);
-            Logger::log('Serving file by path: ' . $path);
-            // Validate file path (prevent directory traversal)
-            $fullFilePath = ROOT_PATH . '/' . $path;
+            // Prepend uploads/ to path since /api/res/ maps to uploads/ directory
+            $fullPath = 'uploads/' . $path;
+            $fullFilePath = ROOT_PATH . '/' . $fullPath;
             $realPath = realpath($fullFilePath);
-            $uploadsPath = realpath(ROOT_PATH . '/uploads/');
+            
+            // Define allowed storage directories (uploads is root for all user-generated resources)
+            $allowedPaths = [
+                realpath(ROOT_PATH . '/uploads/files/'),
+                realpath(ROOT_PATH . '/uploads/icons/'),
+                realpath(ROOT_PATH . '/uploads/notices/'),
+                realpath(ROOT_PATH . '/uploads/profile_images/'),
+                realpath(ROOT_PATH . '/uploads/questions/'),
+            ];
 
-            // Ensure path is within uploads directory
-            if (!$realPath || strpos($realPath, $uploadsPath) !== 0) {
+            // Ensure path is within one of the allowed directories
+            $isAllowedPath = false;
+            foreach ($allowedPaths as $allowedPath) {
+                if ($allowedPath && strpos($realPath, $allowedPath) === 0) {
+                    $isAllowedPath = true;
+                    break;
+                }
+            }
+
+            if (!$realPath || !$isAllowedPath) {
                 $this->response->error('Invalid file path', 403);
                 return;
             }
@@ -511,12 +527,7 @@ class FileController
     {
         try {
             $currentUser = AuthMiddleware::getCurrentUser();
-
-            if (!$currentUser) {
-                $this->response->error('Authentication required', 401);
-                return;
-            }
-
+  
             // Validate folder exists
             $folder = \EMA\Models\Folder::findById($folderId);
             if (!$folder) {
@@ -526,8 +537,8 @@ class FileController
 
             // Extract pagination parameters
             $pagination = \EMA\Utils\Pagination::extractFromRequest($this->request);
-            $page = $pagination['page'];
-            $perPage = $pagination['perPage'];
+            $page = array_key_exists('page', $pagination) ? $pagination['page'] : 1;
+            $perPage = array_key_exists('per_page', $pagination) ? $pagination['per_page'] : 10;
 
             // Extract optional filters
             $search = $this->request->getQueryParameter('search');
