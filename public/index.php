@@ -48,10 +48,10 @@ $router->get('/api/csrf/token', [CsrfController::class, 'getToken']);
 // Authentication routes
 $router->post('/api/auth/login', [AuthController::class, 'login']);
 $router->post('/api/auth/register', [AuthController::class, 'register']);
-$router->post('/api/auth/logout', [AuthController::class, 'logout'], [AuthMiddleware::class]);
+$router->post('/api/auth/logout', [AuthController::class, 'logout'], [AuthMiddleware::class, CsrfMiddleware::class]);
 $router->post('/api/auth/forgot-password', [AuthController::class, 'forgotPassword']);
 $router->post('/api/auth/reset-password', [AuthController::class, 'resetPassword']);
-$router->post('/api/auth/change-password', [AuthController::class, 'changePassword'], [AuthMiddleware::class]);
+$router->post('/api/auth/change-password', [AuthController::class, 'changePassword'], [AuthMiddleware::class, CsrfMiddleware::class]);
 $router->get('/api/auth/me', [AuthController::class, 'me'], [AuthMiddleware::class]);
 
 // User routes
@@ -61,17 +61,17 @@ $router->put('/api/users/{id}', [UserController::class, 'update'], [AuthMiddlewa
 $router->delete('/api/users/{id}', [UserController::class, 'delete'], [AuthMiddleware::class, CsrfMiddleware::class]);
 
 // Folder routes
-$router->get('/api/folders', [FolderController::class, 'index'], [AuthMiddleware::class, CsrfMiddleware::class]);
+$router->get('/api/folders', [FolderController::class, 'index'], [AuthMiddleware::class]);
 $router->post('/api/folders', [FolderController::class, 'store'], [AuthMiddleware::class, CsrfMiddleware::class]);
-$router->get('/api/folders/{id}', [FolderController::class, 'show'], [AuthMiddleware::class, CsrfMiddleware::class]);
+$router->get('/api/folders/{id}', [FolderController::class, 'show'], [AuthMiddleware::class]);
 $router->put('/api/folders/{id}', [FolderController::class, 'update'], [AuthMiddleware::class, CsrfMiddleware::class]);
 $router->delete('/api/folders/{id}', [FolderController::class, 'delete'], [AuthMiddleware::class, CsrfMiddleware::class]);
 
 // File routes
 $router->post('/api/files/upload', [FileController::class, 'upload'], [AuthMiddleware::class, CsrfMiddleware::class]);
 $router->delete('/api/files/{id}', [FileController::class, 'delete'], [AuthMiddleware::class, CsrfMiddleware::class]);
-$router->get('/api/files/{id}/download', [FileController::class, 'download'], [AuthMiddleware::class, CsrfMiddleware::class]);
-$router->get('/api/files/{path:.+/.+}', [FileController::class, 'serveByPath'], [AuthMiddleware::class, CsrfMiddleware::class]);
+$router->get('/api/files/{id}/download', [FileController::class, 'download'], [AuthMiddleware::class]);
+$router->get('/api/files/{path:.+/.+}', [FileController::class, 'serveByPath'], [AuthMiddleware::class]);
 
 // Admin routes
 $router->post('/api/admin/grant', [AdminController::class, 'grant'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
