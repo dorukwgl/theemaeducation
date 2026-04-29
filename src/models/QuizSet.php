@@ -528,9 +528,27 @@ class QuizSet
                 $types .= 'i';
             }
 
-            // Add published filter
-            if ($publishedOnly) {
+            // Add published filter for non-admin users
+            if ($publishedOnly && $userId !== null) {
                 $conditions[] = 'qs.is_published = 1';
+            }
+
+            // Add access control filtering for non-admin users
+            if ($userId !== null && !User::isAdminById($userId)) {
+                $conditions[] = "(
+                    qs.access_type = 'all'
+                    OR qs.access_type = 'logged_in'
+                    OR qs.id IN (
+                        SELECT ap.item_id
+                        FROM access_permissions ap
+                        WHERE ap.item_type = 'quiz_set'
+                        AND ap.identifier = CONCAT('user_', ?)
+                        AND ap.is_active = 1
+                        AND (ap.access_times = 0 OR ap.times_accessed < ap.access_times)
+                    )
+                )";
+                $params[] = $userId;
+                $types .= 'i';
             }
 
             // Build WHERE clause
@@ -599,18 +617,13 @@ class QuizSet
             $total = $countStmt->get_result()->fetch_assoc()['total'];
             $countStmt->close();
 
-            // Filter by user access if userId provided
-            if ($userId !== null) {
-                $quizSets = array_filter($quizSets, function($quizSet) use ($userId) {
-                    return self::checkQuizSetAccess($userId, $quizSet['id']);
-                });
-            }
-
             Logger::info('Quiz sets retrieved successfully', [
                 'page' => $page,
                 'per_page' => $perPage,
                 'total' => $total,
-                'count' => count($quizSets)
+                'count' => count($quizSets),
+                'user_id' => $userId,
+                'admin_access' => $userId === null || User::isAdminById($userId)
             ]);
 
             return $quizSets;
@@ -618,7 +631,8 @@ class QuizSet
             Logger::error('Error retrieving quiz sets', [
                 'error' => $e->getMessage(),
                 'page' => $page,
-                'per_page' => $perPage
+                'per_page' => $perPage,
+                'user_id' => $userId
             ]);
             return [];
         }

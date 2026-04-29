@@ -68,10 +68,11 @@ $router->put('/api/folders/{id}', [FolderController::class, 'update'], [AuthMidd
 $router->delete('/api/folders/{id}', [FolderController::class, 'delete'], [AuthMiddleware::class, CsrfMiddleware::class]);
 
 // File routes
-$router->post('/api/files/upload', [FileController::class, 'upload'], [AuthMiddleware::class, CsrfMiddleware::class]);
-$router->delete('/api/files/{id}', [FileController::class, 'delete'], [AuthMiddleware::class, CsrfMiddleware::class]);
+$router->post('/api/files/upload', [FileController::class, 'upload'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
+$router->delete('/api/files/{id}', [FileController::class, 'delete'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
 $router->get('/api/files/{id}/download', [FileController::class, 'download'], [AuthMiddleware::class]);
 $router->get('/api/files/{path:.+/.+}', [FileController::class, 'serveByPath'], [AuthMiddleware::class]);
+$router->get('/api/folders/{id}/files', [FileController::class, 'folderFiles'], [AuthMiddleware::class]);
 
 // Admin routes
 $router->post('/api/admin/grant', [AdminController::class, 'grant'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
@@ -108,13 +109,13 @@ $router->post('/api/content/free-access', [SystemController::class, 'freeAccess'
 // Quiz routes
 $router->get('/api/quiz-sets', [QuizController::class, 'index'], [AuthMiddleware::class]);
 $router->get('/api/quiz-sets/{id}', [QuizController::class, 'show'], [AuthMiddleware::class]);
-$router->post('/api/quiz-sets', [QuizController::class, 'store'], [AuthMiddleware::class, CsrfMiddleware::class]);
-$router->put('/api/quiz-sets/{id}', [QuizController::class, 'update'], [AuthMiddleware::class, CsrfMiddleware::class]);
-$router->delete('/api/quiz-sets/{id}', [QuizController::class, 'delete'], [AuthMiddleware::class, CsrfMiddleware::class]);
+$router->post('/api/quiz-sets', [QuizController::class, 'store'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
+$router->put('/api/quiz-sets/{id}', [QuizController::class, 'update'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
+$router->delete('/api/quiz-sets/{id}', [QuizController::class, 'delete'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
 $router->get('/api/quiz-sets/{id}/questions', [QuizController::class, 'questions'], [AuthMiddleware::class]);
-$router->post('/api/quiz-sets/{id}/questions', [QuizController::class, 'createQuestion'], [AuthMiddleware::class, CsrfMiddleware::class]);
-$router->put('/api/quiz-sets/{id}/questions/{question_id}', [QuizController::class, 'updateQuestion'], [AuthMiddleware::class, CsrfMiddleware::class]);
-$router->delete('/api/quiz-sets/{id}/questions/{question_id}', [QuizController::class, 'deleteQuestion'], [AuthMiddleware::class, CsrfMiddleware::class]);
+$router->post('/api/quiz-sets/{id}/questions', [QuizController::class, 'createQuestion'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
+$router->put('/api/quiz-sets/{id}/questions/{question_id}', [QuizController::class, 'updateQuestion'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
+$router->delete('/api/quiz-sets/{id}/questions/{question_id}', [QuizController::class, 'deleteQuestion'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
 $router->post('/api/quiz-sets/{id}/start', [QuizController::class, 'startAttempt'], [AuthMiddleware::class, CsrfMiddleware::class]);
 $router->post('/api/quiz-sets/{id}/submit', [QuizController::class, 'submitAttempt'], [AuthMiddleware::class, CsrfMiddleware::class]);
 $router->get('/api/quiz-sets/{id}/statistics', [QuizController::class, 'statistics'], [AuthMiddleware::class]);

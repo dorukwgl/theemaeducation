@@ -502,4 +502,77 @@ class FileController
 
         return $filename;
     }
+
+    /**
+     * List files in a specific folder with pagination
+     * GET /api/folders/{id}/files
+     */
+    public function folderFiles(int $folderId): void
+    {
+        try {
+            $currentUser = AuthMiddleware::getCurrentUser();
+
+            if (!$currentUser) {
+                $this->response->error('Authentication required', 401);
+                return;
+            }
+
+            // Validate folder exists
+            $folder = \EMA\Models\Folder::findById($folderId);
+            if (!$folder) {
+                $this->response->error('Folder not found', 404);
+                return;
+            }
+
+            // Extract pagination parameters
+            $pagination = \EMA\Utils\Pagination::extractFromRequest($this->request);
+            $page = $pagination['page'];
+            $perPage = $pagination['perPage'];
+
+            // Extract optional filters
+            $search = $this->request->getQueryParameter('search');
+            $accessType = $this->request->getQueryParameter('access_type');
+
+            // Validate access_type parameter
+            if ($accessType && !in_array($accessType, ['all', 'logged_in'])) {
+                $this->response->error('Invalid access_type parameter. Must be "all" or "logged_in"', 400);
+                return;
+            }
+
+            // Determine user ID for filtering (null for admin, user ID for non-admin)
+            $userId = ($currentUser['role'] === 'admin') ? null : $currentUser['id'];
+
+            // Get paginated files with access control
+            $result = File::getFilesByFolderPaginated($folderId, $page, $perPage, $search, $accessType, $userId);
+
+            // Get total files count for access info
+            $totalFilesInFolder = File::getFilesByFolderCount($folderId, null, null, null);
+            $accessibleFilesCount = ($currentUser['role'] === 'admin') ? $totalFilesInFolder : $result['total'];
+
+            // Build access information
+            $accessInfo = [
+                'user_role' => $currentUser['role'],
+                'accessible_files_in_folder' => $accessibleFilesCount,
+                'total_files_in_folder' => $totalFilesInFolder,
+                'filtering_applied' => $currentUser['role'] !== 'admin'
+            ];
+
+            // Build response data
+            $responseData = [
+                'folder' => $folder,
+                'files' => $result['files'],
+                'pagination' => $result['pagination'],
+                'access_info' => $accessInfo
+            ];
+
+            $this->response->success($responseData, 'Folder files retrieved successfully');
+        } catch (\Exception $e) {
+            Logger::error('Folder files listing error', [
+                'folder_id' => $folderId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->response->error('Failed to retrieve folder files', 500);
+        }
+    }
 }

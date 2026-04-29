@@ -48,8 +48,6 @@ class File
                 'folder_icon_path' => $file['folder_icon_path']
             ];
 
-            Logger::info('File found by ID', ['file_id' => $id]);
-
             return $fileData;
         } catch (\Exception $e) {
             Logger::error('Error finding file by ID', [
@@ -70,7 +68,6 @@ class File
         try {
             // Validate required fields
             if (!isset($data['folder_id']) || !isset($data['name']) || !isset($data['file_path'])) {
-                Logger::warning('File creation failed: Missing required fields', ['data' => $data]);
                 return false;
             }
 
@@ -83,13 +80,11 @@ class File
             // Validate folder exists
             $folder = \EMA\Models\Folder::findById($folderId);
             if (!$folder) {
-                Logger::warning('File creation failed: Folder not found', ['folder_id' => $folderId]);
                 return false;
             }
 
             // Validate access_type
             if (!in_array($accessType, ['all', 'logged_in'])) {
-                Logger::warning('File creation failed: Invalid access type', ['access_type' => $accessType]);
                 return false;
             }
 
@@ -101,14 +96,6 @@ class File
             if ($stmt->execute()) {
                 $fileId = $stmt->insert_id;
                 $stmt->close();
-
-                Logger::info('File created successfully', [
-                    'file_id' => $fileId,
-                    'folder_id' => $folderId,
-                    'name' => $name,
-                    'access_type' => $accessType
-                ]);
-
                 return $fileId;
             }
 
@@ -136,7 +123,6 @@ class File
             // Check if file exists
             $file = self::findById($id);
             if (!$file) {
-                Logger::warning('File update failed: File not found', ['file_id' => $id]);
                 return false;
             }
 
@@ -150,7 +136,6 @@ class File
 
                 // Validate folder exists
                 if (!\EMA\Models\Folder::findById($newFolderId)) {
-                    Logger::warning('File update failed: Folder not found', ['folder_id' => $newFolderId]);
                     return false;
                 }
 
@@ -178,10 +163,6 @@ class File
                 // Delete old icon if exists
                 if ($file['icon_path'] && file_exists(ROOT_PATH . '/' . $file['icon_path'])) {
                     unlink(ROOT_PATH . '/' . $file['icon_path']);
-                    Logger::info('Old file icon deleted', [
-                        'file_id' => $id,
-                        'old_icon_path' => $file['icon_path']
-                    ]);
                 }
 
                 $updates[] = 'icon_path = ?';
@@ -195,7 +176,6 @@ class File
 
                 // Validate access_type
                 if (!in_array($accessType, ['all', 'logged_in'])) {
-                    Logger::warning('File update failed: Invalid access type', ['access_type' => $accessType]);
                     return false;
                 }
 
@@ -205,7 +185,6 @@ class File
             }
 
             if (empty($updates)) {
-                Logger::warning('File update failed: No valid fields to update');
                 return false;
             }
 
@@ -219,11 +198,6 @@ class File
 
             if ($stmt->execute()) {
                 $stmt->close();
-
-                Logger::info('File updated successfully', [
-                    'file_id' => $id,
-                    'updates' => array_keys($data)
-                ]);
 
                 return true;
             }
@@ -252,7 +226,6 @@ class File
             // Check if file exists
             $file = self::findById($id);
             if (!$file) {
-                Logger::warning('File deletion failed: File not found', ['file_id' => $id]);
                 return false;
             }
 
@@ -270,13 +243,11 @@ class File
                 // Delete icon file if exists
                 if ($file['icon_path'] && file_exists(ROOT_PATH . '/' . $file['icon_path'])) {
                     unlink(ROOT_PATH . '/' . $file['icon_path']);
-                    Logger::info('File icon deleted', ['icon_path' => $file['icon_path']]);
                 }
 
                 // Delete physical file
                 if (file_exists(ROOT_PATH . '/' . $file['file_path'])) {
                     unlink(ROOT_PATH . '/' . $file['file_path']);
-                    Logger::info('Physical file deleted', ['file_path' => $file['file_path']]);
                 }
 
                 // Delete file record
@@ -288,12 +259,6 @@ class File
 
                 if ($result) {
                     \EMA\Config\Database::commit();
-
-                    Logger::info('File deleted successfully with cascade', [
-                        'file_id' => $id,
-                        'name' => $file['name']
-                    ]);
-
                     return true;
                 }
 
@@ -398,8 +363,6 @@ class File
                 'is_public' => $file['access_type'] === 'all'
             ];
 
-            Logger::info('File stats retrieved', ['file_id' => $fileId]);
-
             return $statistics;
         } catch (\Exception $e) {
             Logger::error('Error getting file stats', [
@@ -421,7 +384,6 @@ class File
         try {
             // Check if folder exists
             if (!\EMA\Models\Folder::findById($folderId)) {
-                Logger::warning('Files by folder failed: Folder not found', ['folder_id' => $folderId]);
                 return [];
             }
 
@@ -478,13 +440,6 @@ class File
             }
 
             $stmt->close();
-
-            Logger::info('Files by folder retrieved', [
-                'folder_id' => $folderId,
-                'user_id' => $userId,
-                'file_count' => count($files)
-            ]);
-
             return $files;
         } catch (\Exception $e) {
             Logger::error('Error getting files by folder', [
@@ -493,6 +448,182 @@ class File
                 'error' => $e->getMessage()
             ]);
             return [];
+        }
+    }
+
+    /**
+     * Get files by folder with pagination and access control filtering
+     * @param int $folderId Folder ID
+     * @param int $page Page number (1-based)
+     * @param int $perPage Items per page
+     * @param string|null $search Optional search term for file names
+     * @param string|null $accessType Optional access type filter
+     * @param int|null $userId Optional User ID for access filtering (null = admin/all files)
+     * @return array Paginated files with metadata
+     */
+    public static function getFilesByFolderPaginated(int $folderId, int $page, int $perPage, ?string $search = null, ?string $accessType = null, ?int $userId = null): array
+    {
+        try {
+            if (!\EMA\Models\Folder::findById($folderId)) {
+                return [];
+            }
+
+            $query = "
+                SELECT f.id, f.name, f.file_path, f.icon_path, f.access_type, f.created_at,
+                       fl.name as folder_name, fl.icon_path as folder_icon_path
+                FROM files f
+                LEFT JOIN folders fl ON f.folder_id = fl.id
+                WHERE f.folder_id = ?
+            ";
+
+            $params = [$folderId];
+            $types = 'i';
+
+            if ($search) {
+                $query .= " AND f.name LIKE ?";
+                $params[] = "%{$search}%";
+                $types .= 's';
+            }
+
+            if ($accessType && in_array($accessType, ['all', 'logged_in'])) {
+                $query .= " AND f.access_type = ?";
+                $params[] = $accessType;
+                $types .= 's';
+            }
+
+            if ($userId !== null) {
+                $query .= " AND (
+                    f.access_type = 'all'
+                    OR f.access_type = 'logged_in'
+                    OR f.id IN (
+                        SELECT ap.item_id
+                        FROM access_permissions ap
+                        WHERE ap.item_type = 'file'
+                        AND ap.identifier = CONCAT('user_', ?)
+                        AND ap.is_active = 1
+                        AND (ap.access_times = 0 OR ap.times_accessed < ap.access_times)
+                    )
+                )";
+                $params[] = $userId;
+                $types .= 'i';
+            }
+
+            $offset = \EMA\Utils\Pagination::getOffset($page, $perPage);
+            $query .= " ORDER BY f.id DESC LIMIT ? OFFSET ?";
+            $params[] = $perPage;
+            $params[] = $offset;
+            $types .= 'ii';
+
+            $stmt = \EMA\Config\Database::prepare($query);
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            $files = [];
+            while ($row = $result->fetch_assoc()) {
+                $files[] = [
+                    'id' => (int) $row['id'],
+                    'name' => $row['name'],
+                    'file_path' => $row['file_path'],
+                    'icon_path' => $row['icon_path'],
+                    'access_type' => $row['access_type'],
+                    'created_at' => $row['created_at'],
+                    'folder_name' => $row['folder_name'],
+                    'folder_icon_path' => $row['folder_icon_path']
+                ];
+            }
+
+            $stmt->close();
+
+            $total = self::getFilesByFolderCount($folderId, $search, $accessType, $userId);
+            $pagination = \EMA\Utils\Pagination::getMetadata($page, $perPage, $total);
+
+            return [
+                'files' => $files,
+                'pagination' => $pagination,
+                'total' => $total
+            ];
+        } catch (\Exception $e) {
+            Logger::error('Error getting files by folder paginated', [
+                'folder_id' => $folderId,
+                'page' => $page,
+                'per_page' => $perPage,
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            return [
+                'files' => [],
+                'pagination' => \EMA\Utils\Pagination::getMetadata(1, $perPage, 0),
+                'total' => 0
+            ];
+        }
+    }
+
+    /**
+     * Count files in folder with optional filters
+     * @param int $folderId Folder ID
+     * @param string|null $search Optional search term for file names
+     * @param string|null $accessType Optional access type filter
+     * @param int|null $userId Optional User ID for access filtering (null = admin/all files)
+     * @return int Total count of matching files
+     */
+    public static function getFilesByFolderCount(int $folderId, ?string $search = null, ?string $accessType = null, ?int $userId = null): int
+    {
+        try {
+            $query = "
+                SELECT COUNT(DISTINCT f.id) as total
+                FROM files f
+                WHERE f.folder_id = ?
+            ";
+
+            $params = [$folderId];
+            $types = 'i';
+
+            if ($search) {
+                $query .= " AND f.name LIKE ?";
+                $params[] = "%{$search}%";
+                $types .= 's';
+            }
+
+            if ($accessType && in_array($accessType, ['all', 'logged_in'])) {
+                $query .= " AND f.access_type = ?";
+                $params[] = $accessType;
+                $types .= 's';
+            }
+
+            if ($userId !== null) {
+                $query .= " AND (
+                    f.access_type = 'all'
+                    OR f.access_type = 'logged_in'
+                    OR f.id IN (
+                        SELECT ap.item_id
+                        FROM access_permissions ap
+                        WHERE ap.item_type = 'file'
+                        AND ap.identifier = CONCAT('user_', ?)
+                        AND ap.is_active = 1
+                        AND (ap.access_times = 0 OR ap.times_accessed < ap.access_times)
+                    )
+                )";
+                $params[] = $userId;
+                $types .= 'i';
+            }
+
+            $stmt = \EMA\Config\Database::prepare($query);
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $row = $result->fetch_assoc();
+            $stmt->close();
+
+            $total = (int) ($row['total'] ?? 0);
+            return $total;
+        } catch (\Exception $e) {
+            Logger::error('Error counting files by folder', [
+                'folder_id' => $folderId,
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            return 0;
         }
     }
 }
