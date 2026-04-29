@@ -77,9 +77,9 @@ class FileController
                 return;
             }
 
-            // Generate secure filename
+            // Generate secure filename using UUID
             $extension = $validationResult['extension'];
-            $secureFilename = 'file_' . time() . '_' . bin2hex(random_bytes(16)) . '.' . $extension;
+            $secureFilename = 'file_' . bin2hex(random_bytes(16)) . '.' . $extension;
             $filePath = 'uploads/files/' . $secureFilename;
 
             // Move file to uploads directory
@@ -111,7 +111,7 @@ class FileController
                     return;
                 }
 
-                $iconFilename = 'icon_' . time() . '_' . bin2hex(random_bytes(8)) . '.' . $iconValidation['extension'];
+                $iconFilename = 'icon_' . bin2hex(random_bytes(16)) . '.' . $iconValidation['extension'];
                 $iconPath = 'uploads/icons/' . $iconFilename;
                 $iconFullPath = ROOT_PATH . '/' . $iconPath;
 
@@ -191,6 +191,8 @@ class FileController
     public function serveByPath(string $path): void
     {
         try {
+            // URL-decode the path to handle special characters
+            $path = urldecode($path);
             Logger::log('Serving file by path: ' . $path);
             // Validate file path (prevent directory traversal)
             $fullFilePath = ROOT_PATH . '/' . $path;

@@ -718,8 +718,8 @@ class Question
                 return $result;
             }
 
-            // Generate secure filename
-            $secureFilename = 'question_' . time() . '_' . bin2hex(random_bytes(8)) . '.' . $extension;
+            // Generate secure filename using UUID
+            $secureFilename = 'question_' . bin2hex(random_bytes(16)) . '.' . $extension;
             $filePath = Constants::PATH_QUESTIONS . '/' . $secureFilename;
 
             // Determine if this is an image file
@@ -826,8 +826,8 @@ class Question
                 return $result;
             }
 
-            // Generate secure filename
-            $secureFilename = 'choice_' . $choice . '_' . time() . '_' . bin2hex(random_bytes(8)) . '.' . $extension;
+            // Generate secure filename using UUID with choice
+            $secureFilename = 'choice_' . $choice . '_' . bin2hex(random_bytes(16)) . '.' . $extension;
             $filePath = Constants::PATH_CHOICES . '/' . $secureFilename;
 
             // Determine if this is an image file

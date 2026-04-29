@@ -234,9 +234,9 @@ class NoticeService
         $result = ['success' => false, 'file_path' => null, 'file_name' => null];
 
         try {
-            // Generate secure filename
+            // Generate secure filename using UUID
             $extension = strtolower(pathinfo($uploadedFile['name'], PATHINFO_EXTENSION));
-            $secureFilename = 'notice_' . time() . '_' . bin2hex(random_bytes(8)) . '.' . $extension;
+            $secureFilename = 'notice_' . bin2hex(random_bytes(16)) . '.' . $extension;
             $filePath = 'uploads/notices/' . $secureFilename;
 
             // Move file to uploads directory
