@@ -285,13 +285,6 @@ class FolderController
                 return;
             }
 
-            // Validate CSRF token
-            $data = $this->request->allInput();
-            if (!$this->validateCsrfToken($data)) {
-                $this->response->error('Invalid CSRF token', 403);
-                return;
-            }
-
             // Check if folder exists
             $folder = Folder::findById($id);
             if (!$folder) {

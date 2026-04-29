@@ -49,32 +49,19 @@ class QuizController
             $userId = \EMA\Middleware\AuthMiddleware::getCurrentUserId();
             $quizSets = QuizSet::getAllQuizSets($page, $perPage, $folderId, $userId, $includeQuestionCount, $publishedOnly);
 
-            Response::json([
-                'success' => true,
-                'message' => 'Quiz sets retrieved successfully',
-                'data' => [
-                    'quiz_sets' => $quizSets,
-                    'page' => $page,
-                    'per_page' => $perPage
-                ]
-            ]);
-
-            Logger::info('Quiz sets listed', [
-                'user_id' => $userId,
+            $this->response->success([
+                'quiz_sets' => $quizSets,
                 'page' => $page,
                 'per_page' => $perPage
-            ]);
+            ], 'Quiz sets retrieved successfully');
+
         } catch (\Exception $e) {
             Logger::error('Error listing quiz sets', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
 
-            Response::json([
-                'success' => false,
-                'message' => 'Failed to retrieve quiz sets',
-                'errors' => ['Internal server error']
-            ], 500);
+            $this->response->error('Failed to retrieve quiz sets', 500, ['Internal server error']);
         }
     }
 
@@ -94,19 +81,13 @@ class QuizController
             $quizSet = QuizSet::findById($id);
 
             if (!$quizSet) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Quiz set not found'
-                ], 404);
+                $this->response->notFound('Quiz set not found');
                 return;
             }
 
             // Check access
             if (!QuizSet::checkQuizSetAccess($userId, $id)) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Access denied to quiz set'
-                ], 403);
+                $this->response->forbidden('Access denied to quiz set');
                 return;
             }
 
@@ -137,18 +118,8 @@ class QuizController
                 $responseData['stats'] = $stats;
             }
 
-            Response::json([
-                'success' => true,
-                'message' => 'Quiz set retrieved successfully',
-                'data' => $responseData
-            ]);
+            $this->response->success($responseData, 'Quiz set retrieved successfully');
 
-            Logger::info('Quiz set viewed', [
-                'user_id' => $userId,
-                'quiz_set_id' => $id,
-                'include_questions' => $includeQuestions,
-                'include_stats' => $includeStats
-            ]);
         } catch (\Exception $e) {
             Logger::error('Error getting quiz set details', [
                 'quiz_set_id' => $id,
@@ -156,11 +127,7 @@ class QuizController
                 'trace' => $e->getTraceAsString()
             ]);
 
-            Response::json([
-                'success' => false,
-                'message' => 'Failed to retrieve quiz set',
-                'errors' => ['Internal server error']
-            ], 500);
+            $this->response->error('Failed to retrieve quiz set', 500, ['Internal server error']);
         }
     }
 
@@ -174,33 +141,17 @@ class QuizController
         try {
             // Require admin role
             if (!\EMA\Middleware\AuthMiddleware::isAdmin()) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Admin access required'
-                ], 403);
+                $this->response->forbidden('Admin access required');
                 return;
             }
 
-                        $data = $request->all();
-
-            // Validate CSRF token
-            if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Invalid CSRF token'
-                ], 422);
-                return;
-            }
+            $data = $this->request->allInput();
 
             // Validate input data
             $validation = $this->quizService->validateQuizSetData($data);
 
             if (!$validation['success']) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Validation failed',
-                    'errors' => $validation['errors']
-                ], 422);
+                $this->response->validationError($validation['errors']);
                 return;
             }
 
@@ -211,23 +162,11 @@ class QuizController
             $quizSetId = QuizSet::create($sanitizedData);
 
             if ($quizSetId) {
-                Response::json([
-                    'success' => true,
-                    'message' => 'Quiz set created successfully',
-                    'data' => [
-                        'quiz_set' => QuizSet::findById($quizSetId)
-                    ]
-                ], 201);
-
-                Logger::logSecurityEvent('Quiz set created', [
-                    'quiz_set_id' => $quizSetId,
-                    'created_by' => $sanitizedData['created_by']
-                ]);
+                $this->response->created([
+                    'quiz_set' => QuizSet::findById($quizSetId)
+                ], 'Quiz set created successfully');
             } else {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Failed to create quiz set'
-                ], 500);
+                $this->response->error('Failed to create quiz set', 500);
             }
         } catch (\Exception $e) {
             Logger::error('Error creating quiz set', [
@@ -235,11 +174,7 @@ class QuizController
                 'trace' => $e->getTraceAsString()
             ]);
 
-            Response::json([
-                'success' => false,
-                'message' => 'Failed to create quiz set',
-                'errors' => ['Internal server error']
-            ], 500);
+            $this->response->error('Failed to create quiz set', 500, ['Internal server error']);
         }
     }
 
@@ -253,31 +188,22 @@ class QuizController
         try {
             // Require admin role
             if (!\EMA\Middleware\AuthMiddleware::isAdmin()) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Admin access required'
-                ], 403);
+                $this->response->forbidden('Admin access required');
                 return;
             }
 
             // Check if quiz set exists
             $quizSet = QuizSet::findById($id);
             if (!$quizSet) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Quiz set not found'
-                ], 404);
+                $this->response->notFound('Quiz set not found');
                 return;
             }
 
-                        $data = $request->all();
+            $data = $this->request->allInput();
 
             // Validate CSRF token
             if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Invalid CSRF token'
-                ], 422);
+                $this->response->validationError(['csrf_token' => 'Invalid CSRF token']);
                 return;
             }
 
@@ -285,11 +211,7 @@ class QuizController
             $validation = $this->quizService->validateQuizSetData($data);
 
             if (!$validation['success']) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Validation failed',
-                    'errors' => $validation['errors']
-                ], 422);
+                $this->response->validationError($validation['errors']);
                 return;
             }
 
@@ -299,23 +221,11 @@ class QuizController
             $result = QuizSet::update($id, $sanitizedData);
 
             if ($result) {
-                Response::json([
-                    'success' => true,
-                    'message' => 'Quiz set updated successfully',
-                    'data' => [
-                        'quiz_set' => QuizSet::findById($id)
-                    ]
-                ]);
-
-                Logger::logSecurityEvent('Quiz set updated', [
-                    'quiz_set_id' => $id,
-                    'updated_by' => \EMA\Middleware\AuthMiddleware::getCurrentUserId()
-                ]);
+                $this->response->success([
+                    'quiz_set' => QuizSet::findById($id)
+                ], 'Quiz set updated successfully');
             } else {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Failed to update quiz set'
-                ], 500);
+                $this->response->error('Failed to update quiz set', 500);
             }
         } catch (\Exception $e) {
             Logger::error('Error updating quiz set', [
@@ -324,11 +234,7 @@ class QuizController
                 'trace' => $e->getTraceAsString()
             ]);
 
-            Response::json([
-                'success' => false,
-                'message' => 'Failed to update quiz set',
-                'errors' => ['Internal server error']
-            ], 500);
+            $this->response->error('Failed to update quiz set', 500, ['Internal server error']);
         }
     }
 
@@ -342,31 +248,22 @@ class QuizController
         try {
             // Require admin role
             if (!\EMA\Middleware\AuthMiddleware::isAdmin()) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Admin access required'
-                ], 403);
+                $this->response->forbidden('Admin access required');
                 return;
             }
 
             // Check if quiz set exists
             $quizSet = QuizSet::findById($id);
             if (!$quizSet) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Quiz set not found'
-                ], 404);
+                $this->response->notFound('Quiz set not found');
                 return;
             }
 
-                        $data = $request->all();
+            $data = $this->request->allInput();
 
             // Validate CSRF token
             if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Invalid CSRF token'
-                ], 422);
+                $this->response->validationError(['csrf_token' => 'Invalid CSRF token']);
                 return;
             }
 
@@ -374,20 +271,9 @@ class QuizController
             $result = QuizSet::delete($id);
 
             if ($result) {
-                Response::json([
-                    'success' => true,
-                    'message' => 'Quiz set deleted successfully'
-                ]);
-
-                Logger::logSecurityEvent('Quiz set deleted', [
-                    'quiz_set_id' => $id,
-                    'deleted_by' => \EMA\Middleware\AuthMiddleware::getCurrentUserId()
-                ]);
+                $this->response->success([], 'Quiz set deleted successfully');
             } else {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Failed to delete quiz set'
-                ], 500);
+                $this->response->error('Failed to delete quiz set', 500);
             }
         } catch (\Exception $e) {
             Logger::error('Error deleting quiz set', [
@@ -396,11 +282,7 @@ class QuizController
                 'trace' => $e->getTraceAsString()
             ]);
 
-            Response::json([
-                'success' => false,
-                'message' => 'Failed to delete quiz set',
-                'errors' => ['Internal server error']
-            ], 500);
+            $this->response->error('Failed to delete quiz set', 500, ['Internal server error']);
         }
     }
 
@@ -424,18 +306,12 @@ class QuizController
             // Check if quiz set exists and user has access
             $quizSet = QuizSet::findById($id);
             if (!$quizSet) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Quiz set not found'
-                ], 404);
+                $this->response->notFound('Quiz set not found');
                 return;
             }
 
             if (!QuizSet::checkQuizSetAccess($userId, $id)) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Access denied to quiz set'
-                ], 403);
+                $this->response->forbidden('Access denied to quiz set');
                 return;
             }
 
@@ -464,23 +340,13 @@ class QuizController
                 unset($question);
             }
 
-            Response::json([
-                'success' => true,
-                'message' => 'Questions retrieved successfully',
-                'data' => [
-                    'questions' => $questions,
-                    'total' => $totalQuestions,
-                    'page' => $page,
-                    'per_page' => $perPage,
-                    'quiz_set_id' => $id
-                ]
-            ]);
-
-            Logger::info('Quiz set questions viewed', [
-                'user_id' => $userId,
-                'quiz_set_id' => $id,
-                'page' => $page
-            ]);
+            $this->response->success([
+                'questions' => $questions,
+                'total' => $totalQuestions,
+                'page' => $page,
+                'per_page' => $perPage,
+                'quiz_set_id' => $id
+            ], 'Questions retrieved successfully');
         } catch (\Exception $e) {
             Logger::error('Error getting quiz set questions', [
                 'quiz_set_id' => $id,
@@ -488,11 +354,7 @@ class QuizController
                 'trace' => $e->getTraceAsString()
             ]);
 
-            Response::json([
-                'success' => false,
-                'message' => 'Failed to retrieve questions',
-                'errors' => ['Internal server error']
-            ], 500);
+            $this->response->error('Failed to retrieve questions', 500, ['Internal server error']);
         }
     }
 
@@ -506,44 +368,25 @@ class QuizController
         try {
             // Require admin role
             if (!\EMA\Middleware\AuthMiddleware::isAdmin()) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Admin access required'
-                ], 403);
+                $this->response->forbidden('Admin access required');
                 return;
             }
 
             // Check if quiz set exists
             $quizSet = QuizSet::findById($id);
             if (!$quizSet) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Quiz set not found'
-                ], 404);
+                $this->response->notFound('Quiz set not found');
                 return;
             }
 
-                        $data = $request->all();
+            $data = $this->request->allInput();
             $data['quiz_set_id'] = $id;
-
-            // Validate CSRF token
-            if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Invalid CSRF token'
-                ], 422);
-                return;
-            }
 
             // Validate input data
             $validation = $this->quizService->validateQuestionData($data);
 
             if (!$validation['success']) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Validation failed',
-                    'errors' => $validation['errors']
-                ], 422);
+                $this->response->validationError($validation['errors']);
                 return;
             }
 
@@ -553,24 +396,11 @@ class QuizController
             $questionId = Question::create($sanitizedData);
 
             if ($questionId) {
-                Response::json([
-                    'success' => true,
-                    'message' => 'Question created successfully',
-                    'data' => [
-                        'question' => Question::findById($questionId)
-                    ]
-                ], 201);
-
-                Logger::logSecurityEvent('Question created', [
-                    'question_id' => $questionId,
-                    'quiz_set_id' => $id,
-                    'created_by' => \EMA\Middleware\AuthMiddleware::getCurrentUserId()
-                ]);
+                $this->response->created([
+                    'question' => Question::findById($questionId)
+                ], 'Question created successfully');
             } else {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Failed to create question'
-                ], 500);
+                $this->response->error('Failed to create question', 500);
             }
         } catch (\Exception $e) {
             Logger::error('Error creating question', [
@@ -579,11 +409,7 @@ class QuizController
                 'trace' => $e->getTraceAsString()
             ]);
 
-            Response::json([
-                'success' => false,
-                'message' => 'Failed to create question',
-                'errors' => ['Internal server error']
-            ], 500);
+            $this->response->error('Failed to create question', 500, ['Internal server error']);
         }
     }
 
@@ -597,40 +423,28 @@ class QuizController
         try {
             // Require admin role
             if (!\EMA\Middleware\AuthMiddleware::isAdmin()) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Admin access required'
-                ], 403);
+                $this->response->forbidden('Admin access required');
                 return;
             }
 
             // Check if question exists
             $question = Question::findById($questionId);
             if (!$question) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Question not found'
-                ], 404);
+                $this->response->notFound('Question not found');
                 return;
             }
 
             // Check if question belongs to quiz set
             if ($question['quiz_set_id'] != $id) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Question does not belong to this quiz set'
-                ], 400);
+                $this->response->badRequest('Question does not belong to this quiz set');
                 return;
             }
 
-                        $data = $request->all();
+            $data = $this->request->allInput();
 
             // Validate CSRF token
             if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Invalid CSRF token'
-                ], 422);
+                $this->response->validationError(['csrf_token' => 'Invalid CSRF token']);
                 return;
             }
 
@@ -638,11 +452,7 @@ class QuizController
             $validation = $this->quizService->validateQuestionData($data);
 
             if (!$validation['success']) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Validation failed',
-                    'errors' => $validation['errors']
-                ], 422);
+                $this->response->validationError($validation['errors']);
                 return;
             }
 
@@ -652,24 +462,11 @@ class QuizController
             $result = Question::update($questionId, $sanitizedData);
 
             if ($result) {
-                Response::json([
-                    'success' => true,
-                    'message' => 'Question updated successfully',
-                    'data' => [
-                        'question' => Question::findById($questionId)
-                    ]
-                ]);
-
-                Logger::logSecurityEvent('Question updated', [
-                    'question_id' => $questionId,
-                    'quiz_set_id' => $id,
-                    'updated_by' => \EMA\Middleware\AuthMiddleware::getCurrentUserId()
-                ]);
+                $this->response->success([
+                    'question' => Question::findById($questionId)
+                ], 'Question updated successfully');
             } else {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Failed to update question'
-                ], 500);
+                $this->response->error('Failed to update question', 500);
             }
         } catch (\Exception $e) {
             Logger::error('Error updating question', [
@@ -679,11 +476,7 @@ class QuizController
                 'trace' => $e->getTraceAsString()
             ]);
 
-            Response::json([
-                'success' => false,
-                'message' => 'Failed to update question',
-                'errors' => ['Internal server error']
-            ], 500);
+            $this->response->error('Failed to update question', 500, ['Internal server error']);
         }
     }
 
@@ -697,40 +490,28 @@ class QuizController
         try {
             // Require admin role
             if (!\EMA\Middleware\AuthMiddleware::isAdmin()) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Admin access required'
-                ], 403);
+                $this->response->forbidden('Admin access required');
                 return;
             }
 
             // Check if question exists
             $question = Question::findById($questionId);
             if (!$question) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Question not found'
-                ], 404);
+                $this->response->notFound('Question not found');
                 return;
             }
 
             // Check if question belongs to quiz set
             if ($question['quiz_set_id'] != $id) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Question does not belong to this quiz set'
-                ], 400);
+                $this->response->badRequest('Question does not belong to this quiz set');
                 return;
             }
 
-                        $data = $request->all();
+            $data = $this->request->allInput();
 
             // Validate CSRF token
             if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Invalid CSRF token'
-                ], 422);
+                $this->response->validationError(['csrf_token' => 'Invalid CSRF token']);
                 return;
             }
 
@@ -738,24 +519,11 @@ class QuizController
             $result = Question::delete($questionId);
 
             if ($result) {
-                Response::json([
-                    'success' => true,
-                    'message' => 'Question deleted successfully',
-                    'data' => [
-                        'backup_id' => $questionId
-                    ]
-                ]);
-
-                Logger::logSecurityEvent('Question deleted', [
-                    'question_id' => $questionId,
-                    'quiz_set_id' => $id,
-                    'deleted_by' => \EMA\Middleware\AuthMiddleware::getCurrentUserId()
-                ]);
+                $this->response->success([
+                    'backup_id' => $questionId
+                ], 'Question deleted successfully');
             } else {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Failed to delete question'
-                ], 500);
+                $this->response->error('Failed to delete question', 500);
             }
         } catch (\Exception $e) {
             Logger::error('Error deleting question', [
@@ -765,11 +533,7 @@ class QuizController
                 'trace' => $e->getTraceAsString()
             ]);
 
-            Response::json([
-                'success' => false,
-                'message' => 'Failed to delete question',
-                'errors' => ['Internal server error']
-            ], 500);
+            $this->response->error('Failed to delete question', 500, ['Internal server error']);
         }
     }
 
@@ -782,33 +546,24 @@ class QuizController
     {
         try {
             $userId = \EMA\Middleware\AuthMiddleware::getCurrentUserId();
-                        $data = $request->all();
+            $data = $this->request->allInput();
 
             // Check if quiz set exists
             $quizSet = QuizSet::findById($id);
             if (!$quizSet) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Quiz set not found'
-                ], 404);
+                $this->response->notFound('Quiz set not found');
                 return;
             }
 
             // Check access
             if (!QuizSet::checkQuizSetAccess($userId, $id)) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Access denied to quiz set'
-                ], 403);
+                $this->response->forbidden('Access denied to quiz set');
                 return;
             }
 
             // Check if quiz is published
             if (!$quizSet['is_published'] && !\EMA\Middleware\AuthMiddleware::isAdmin()) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Quiz set is not published yet'
-                ], 403);
+                $this->response->forbidden('Quiz set is not published yet');
                 return;
             }
 
@@ -817,16 +572,12 @@ class QuizController
             $randomQuiz = $this->quizService->generateRandomQuiz($id, $questionCount ?? 20);
 
             if (!$randomQuiz['success']) {
-                Response::json([
-                    'success' => false,
-                    'message' => $randomQuiz['message']
-                ], 400);
+                $this->response->badRequest($randomQuiz['message']);
                 return;
             }
 
             // Get user's attempt number
-            $db = \EMA\Config\Database::getInstance();
-            $stmt = $db->prepare("
+            $stmt = \EMA\Config\Database::prepare("
                 SELECT COALESCE(MAX(attempt_number), 0) + 1 as attempt_number
                 FROM quiz_attempts
                 WHERE user_id = ? AND quiz_set_id = ?
@@ -838,7 +589,7 @@ class QuizController
             $stmt->close();
 
             // Create quiz attempt record
-            $stmt = $db->prepare("
+            $stmt = \EMA\Config\Database::prepare("
                 INSERT INTO quiz_attempts (quiz_set_id, user_id, attempt_number, started_at, ip_address)
                 VALUES (?, ?, ?, NOW(), ?)
             ");
@@ -855,26 +606,15 @@ class QuizController
                 'question_count' => count($randomQuiz['questions'])
             ]);
 
-            Response::json([
-                'success' => true,
-                'message' => 'Quiz attempt started successfully',
-                'data' => [
-                    'attempt' => [
-                        'id' => $attemptId,
-                        'attempt_number' => $attemptNumber,
-                        'started_at' => date('Y-m-d H:i:s'),
-                        'quiz_set_id' => $id
-                    ],
-                    'questions' => $randomQuiz['questions']
-                ]
-            ]);
-
-            Logger::info('Quiz attempt started', [
-                'user_id' => $userId,
-                'quiz_set_id' => $id,
-                'attempt_id' => $attemptId,
-                'attempt_number' => $attemptNumber
-            ]);
+            $this->response->success([
+                'attempt' => [
+                    'id' => $attemptId,
+                    'attempt_number' => $attemptNumber,
+                    'started_at' => date('Y-m-d H:i:s'),
+                    'quiz_set_id' => $id
+                ],
+                'questions' => $randomQuiz['questions']
+            ], 'Quiz attempt started successfully');
         } catch (\Exception $e) {
             Logger::error('Error starting quiz attempt', [
                 'quiz_set_id' => $id,
@@ -882,11 +622,7 @@ class QuizController
                 'trace' => $e->getTraceAsString()
             ]);
 
-            Response::json([
-                'success' => false,
-                'message' => 'Failed to start quiz attempt',
-                'errors' => ['Internal server error']
-            ], 500);
+            $this->response->error('Failed to start quiz attempt', 500, ['Internal server error']);
         }
     }
 
@@ -899,14 +635,11 @@ class QuizController
     {
         try {
             $userId = \EMA\Middleware\AuthMiddleware::getCurrentUserId();
-                        $data = $request->all();
+            $data = $this->request->allInput();
 
             // Validate required fields
             if (!isset($data['attempt_id']) || !isset($data['answers']) || !is_array($data['answers'])) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Attempt ID and answers are required'
-                ], 400);
+                $this->response->badRequest('Attempt ID and answers are required');
                 return;
             }
 
@@ -914,8 +647,7 @@ class QuizController
             $answers = $data['answers'];
 
             // Get attempt details
-            $db = \EMA\Config\Database::getInstance();
-            $stmt = $db->prepare("
+            $stmt = \EMA\Config\Database::prepare("
                 SELECT id, user_id, quiz_set_id, started_at
                 FROM quiz_attempts
                 WHERE id = ? LIMIT 1
@@ -925,10 +657,7 @@ class QuizController
             $attemptResult = $stmt->get_result();
 
             if (!$attemptResult->num_rows) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Quiz attempt not found'
-                ], 404);
+                $this->response->notFound('Quiz attempt not found');
                 return;
             }
 
@@ -937,38 +666,26 @@ class QuizController
 
             // Check if attempt belongs to user
             if ($attempt['user_id'] != $userId) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Access denied to this attempt'
-                ], 403);
+                $this->response->forbidden('Access denied to this attempt');
                 return;
             }
 
             // Check if attempt is already completed
             if ($attempt['completed_at']) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Quiz attempt already completed'
-                ], 400);
+                $this->response->badRequest('Quiz attempt already completed');
                 return;
             }
 
             // Validate answers
             foreach ($answers as $answer) {
                 if (!isset($answer['question_id']) || !isset($answer['answer'])) {
-                    Response::json([
-                        'success' => false,
-                        'message' => 'Each answer must have question_id and answer fields'
-                    ], 400);
+                    $this->response->badRequest('Each answer must have question_id and answer fields');
                     return;
                 }
 
                 $answer['answer'] = strtoupper($answer['answer']);
                 if (!in_array($answer['answer'], ['A', 'B', 'C', 'D'])) {
-                    Response::json([
-                        'success' => false,
-                        'message' => 'Invalid answer format for question ' . $answer['question_id']
-                    ], 400);
+                    $this->response->badRequest('Invalid answer format for question ' . $answer['question_id']);
                     return;
                 }
             }
@@ -983,11 +700,14 @@ class QuizController
                 $isCorrect = $question['correct_answer'] === $answer['answer'];
                 $timeSpent = $answer['time_spent_seconds'] ?? null;
 
-                $stmt = $db->prepare("
+                $stmt = \EMA\Config\Database::prepare("
                     INSERT INTO quiz_results (quiz_attempt_id, question_id, user_answer, is_correct, time_spent_seconds)
                     VALUES (?, ?, ?, ?, ?)
                 ");
-                $stmt->bind_param('iisii', $attemptId, (int) $answer['question_id'], $answer['answer'], $isCorrect ? 1 : 0, $timeSpent);
+                $questionId = (int) $answer['question_id'];
+                $userAnswer = $answer['answer'];
+                $correctFlag = $isCorrect ? 1 : 0;
+                $stmt->bind_param('iisii', $attemptId, $questionId, $userAnswer, $correctFlag, $timeSpent);
                 $stmt->execute();
                 $stmt->close();
             }
@@ -995,18 +715,7 @@ class QuizController
             // Calculate score
             $scoreResult = $this->quizService->calculateQuizScore($attemptId);
 
-            Response::json([
-                'success' => true,
-                'message' => 'Quiz submitted successfully',
-                'data' => $scoreResult
-            ]);
-
-            Logger::info('Quiz attempt submitted', [
-                'user_id' => $userId,
-                'quiz_set_id' => $id,
-                'attempt_id' => $attemptId,
-                'score' => $scoreResult['percentage']
-            ]);
+            $this->response->success($scoreResult, 'Quiz submitted successfully');
         } catch (\Exception $e) {
             Logger::error('Error submitting quiz attempt', [
                 'quiz_set_id' => $id,
@@ -1014,11 +723,7 @@ class QuizController
                 'trace' => $e->getTraceAsString()
             ]);
 
-            Response::json([
-                'success' => false,
-                'message' => 'Failed to submit quiz',
-                'errors' => ['Internal server error']
-            ], 500);
+            $this->response->error('Failed to submit quiz', 500, ['Internal server error']);
         }
     }
 
@@ -1031,24 +736,18 @@ class QuizController
     {
         try {
             $userId = \EMA\Middleware\AuthMiddleware::getCurrentUserId();
-                        $timeframe = $this->request->getInput('timeframe');
+            $timeframe = $this->request->getInput('timeframe');
 
             // Check if quiz set exists
             $quizSet = QuizSet::findById($id);
             if (!$quizSet) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Quiz set not found'
-                ], 404);
+                $this->response->notFound('Quiz set not found');
                 return;
             }
 
             // Check permissions
             if (!\EMA\Middleware\AuthMiddleware::isAdmin() && $quizSet['created_by'] != $userId) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Access denied to quiz statistics'
-                ], 403);
+                $this->response->forbidden('Access denied to quiz statistics');
                 return;
             }
 
@@ -1056,22 +755,9 @@ class QuizController
             $analytics = $this->quizService->getQuizAnalytics($id, $timeframe);
 
             if ($analytics['success']) {
-                Response::json([
-                    'success' => true,
-                    'message' => 'Quiz statistics retrieved successfully',
-                    'data' => $analytics
-                ]);
-
-                Logger::info('Quiz statistics viewed', [
-                    'user_id' => $userId,
-                    'quiz_set_id' => $id,
-                    'timeframe' => $timeframe
-                ]);
+                $this->response->success($analytics, 'Quiz statistics retrieved successfully');
             } else {
-                Response::json([
-                    'success' => false,
-                    'message' => $analytics['message']
-                ], 500);
+                $this->response->error($analytics['message'], 500);
             }
         } catch (\Exception $e) {
             Logger::error('Error getting quiz statistics', [
@@ -1080,11 +766,7 @@ class QuizController
                 'trace' => $e->getTraceAsString()
             ]);
 
-            Response::json([
-                'success' => false,
-                'message' => 'Failed to retrieve statistics',
-                'errors' => ['Internal server error']
-            ], 500);
+            $this->response->error('Failed to retrieve statistics', 500, ['Internal server error']);
         }
     }
 
@@ -1097,14 +779,11 @@ class QuizController
     {
         try {
             $userId = \EMA\Middleware\AuthMiddleware::getCurrentUserId();
-                        $data = $request->all();
+            $data = $this->request->allInput();
 
             // Validate required fields
             if (!isset($data['quiz_set_ids']) || !is_array($data['quiz_set_ids'])) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'quiz_set_ids array is required'
-                ], 400);
+                $this->response->badRequest('quiz_set_ids array is required');
                 return;
             }
 
@@ -1112,10 +791,7 @@ class QuizController
 
             // Validate array size (max 50)
             if (count($quizSetIds) > 50) {
-                Response::json([
-                    'success' => false,
-                    'message' => 'Maximum 50 quiz sets allowed per batch check'
-                ], 400);
+                $this->response->badRequest('Maximum 50 quiz sets allowed per batch check');
                 return;
             }
 
@@ -1131,35 +807,21 @@ class QuizController
 
             $accessibleCount = count(array_filter($results, fn($r) => $r['has_access']));
 
-            Response::json([
-                'success' => true,
-                'message' => 'Batch access check completed',
-                'data' => [
-                    'results' => $results,
-                    'summary' => [
-                        'total_checked' => count($quizSetIds),
-                        'accessible_count' => $accessibleCount,
-                        'inaccessible_count' => count($quizSetIds) - $accessibleCount
-                    ]
+            $this->response->success([
+                'results' => $results,
+                'summary' => [
+                    'total_checked' => count($quizSetIds),
+                    'accessible_count' => $accessibleCount,
+                    'inaccessible_count' => count($quizSetIds) - $accessibleCount
                 ]
-            ]);
-
-            Logger::info('Batch quiz set access check', [
-                'user_id' => $userId,
-                'total_checked' => count($quizSetIds),
-                'accessible_count' => $accessibleCount
-            ]);
+            ], 'Batch access check completed');
         } catch (\Exception $e) {
             Logger::error('Error in batch quiz set access check', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
 
-            Response::json([
-                'success' => false,
-                'message' => 'Batch access check failed',
-                'errors' => ['Internal server error']
-            ], 500);
+            $this->response->error('Batch access check failed', 500, ['Internal server error']);
         }
     }
 
@@ -1173,8 +835,7 @@ class QuizController
     private function logQuizActivity(int $quizSetId, ?int $userId, string $action, ?array $details = null): void
     {
         try {
-            $db = \EMA\Config\Database::getInstance();
-            $stmt = $db->prepare("
+            $stmt = \EMA\Config\Database::prepare("
                 INSERT INTO quiz_activity (quiz_set_id, user_id, action, details, ip_address)
                 VALUES (?, ?, ?, ?, ?)
             ");
@@ -1185,12 +846,6 @@ class QuizController
             $stmt->bind_param('iisss', $quizSetId, $userId, $action, $detailsJson, $ipAddress);
             $stmt->execute();
             $stmt->close();
-
-            Logger::info('Quiz activity logged', [
-                'quiz_set_id' => $quizSetId,
-                'user_id' => $userId,
-                'action' => $action
-            ]);
         } catch (\Exception $e) {
             Logger::error('Error logging quiz activity', [
                 'quiz_set_id' => $quizSetId,

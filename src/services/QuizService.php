@@ -211,10 +211,6 @@ class QuizService
             }
 
             if ($questionCount > $totalQuestions) {
-                Logger::warning('Requested more questions than available', [
-                    'requested' => $questionCount,
-                    'available' => $totalQuestions
-                ]);
                 $questionCount = $totalQuestions;
             }
 
@@ -231,11 +227,6 @@ class QuizService
 
             // Shuffle question order
             shuffle($selectedQuestions);
-
-            Logger::info('Random quiz generated', [
-                'quiz_set_id' => $quizSetId,
-                'question_count' => count($selectedQuestions)
-            ]);
 
             return [
                 'success' => true,
@@ -353,12 +344,6 @@ class QuizService
                 'total_questions' => $totalQuestions,
                 'correct_answers' => $correctAnswers,
                 'time_spent_seconds' => $timeSpentSeconds,
-                'passed' => $passed
-            ]);
-
-            Logger::info('Quiz score calculated', [
-                'attempt_id' => $attemptId,
-                'score' => $percentage,
                 'passed' => $passed
             ]);
 
@@ -494,11 +479,6 @@ class QuizService
             $completionRate = $completionStats['total_attempts_started'] > 0
                 ? round(($completionStats['completed_attempts'] / $completionStats['total_attempts_started']) * 100, 2)
                 : 0;
-
-            Logger::info('Quiz analytics retrieved', [
-                'quiz_set_id' => $quizSetId,
-                'timeframe' => $timeframe ?? 'all'
-            ]);
 
             return [
                 'success' => true,
@@ -762,11 +742,6 @@ class QuizService
             $stmt->execute();
             $stmt->close();
 
-            Logger::info('Quiz activity logged', [
-                'quiz_set_id' => $quizSetId,
-                'user_id' => $userId,
-                'action' => $action
-            ]);
         } catch (\Exception $e) {
             Logger::error('Error logging quiz activity', [
                 'quiz_set_id' => $quizSetId,

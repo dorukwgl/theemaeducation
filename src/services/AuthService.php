@@ -84,10 +84,15 @@ class AuthService
         $_SESSION['user_role'] = $user->getRole();
         $_SESSION['last_activity'] = time();
 
+        $csrfToken = Security::generateCsrfToken();
+
+        $userData = $user->toArray();
+        $userData['csrf_token'] = $csrfToken;
+
         return [
             'success' => true,
             'message' => 'Login successful',
-            'data' => $user->toArray()
+            'data' => $userData
         ];
     }
 
@@ -140,10 +145,15 @@ class AuthService
                 $_SESSION['user_image'] = $user->getImage();
             }
 
+            $csrfToken = Security::generateCsrfToken();
+
+            $userData = $user->toArray();
+            $userData['csrf_token'] = $csrfToken;
+
             return [
                 'success' => true,
                 'message' => 'Registration successful',
-                'data' => $user->toArray()
+                'data' => $userData
             ];
         } catch (\Exception $e) {
             Logger::error('Registration failed', [
