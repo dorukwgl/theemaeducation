@@ -184,7 +184,7 @@ class QuizController
                         $data = $request->all();
 
             // Validate CSRF token
-            if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
+            if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
                 Response::json([
                     'success' => false,
                     'message' => 'Invalid CSRF token'
@@ -273,7 +273,7 @@ class QuizController
                         $data = $request->all();
 
             // Validate CSRF token
-            if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
+            if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
                 Response::json([
                     'success' => false,
                     'message' => 'Invalid CSRF token'
@@ -362,7 +362,7 @@ class QuizController
                         $data = $request->all();
 
             // Validate CSRF token
-            if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
+            if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
                 Response::json([
                     'success' => false,
                     'message' => 'Invalid CSRF token'
@@ -527,7 +527,7 @@ class QuizController
             $data['quiz_set_id'] = $id;
 
             // Validate CSRF token
-            if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
+            if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
                 Response::json([
                     'success' => false,
                     'message' => 'Invalid CSRF token'
@@ -626,7 +626,7 @@ class QuizController
                         $data = $request->all();
 
             // Validate CSRF token
-            if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
+            if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
                 Response::json([
                     'success' => false,
                     'message' => 'Invalid CSRF token'
@@ -726,7 +726,7 @@ class QuizController
                         $data = $request->all();
 
             // Validate CSRF token
-            if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
+            if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
                 Response::json([
                     'success' => false,
                     'message' => 'Invalid CSRF token'

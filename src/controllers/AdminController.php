@@ -837,4 +837,65 @@ class AdminController
             $this->response->error('Failed to process password reset approval', 500);
         }
     }
+
+    public function changePassword(): void
+    {
+        try {
+            $currentUser = AuthMiddleware::getCurrentUser();
+
+            // Check if current user is admin
+            if (!$currentUser || $currentUser['role'] !== 'admin') {
+                $this->response->error('Only admins can change passwords', 403);
+                return;
+            }
+
+            $data = $this->request->allInput();
+
+            // Validate input
+            $validation = Validator::make($data, [
+                'user_id' => 'required|integer',
+                'new_password' => 'required|string|min:8|max:50'
+            ]);
+
+            if (!$validation->validate()) {
+                $this->response->validationError($validation->getErrors(), 'Validation failed');
+                return;
+            }
+
+            $userId = (int) $data['user_id'];
+            $newPassword = $data['new_password'];
+
+            // Check if user exists
+            $user = User::findById($userId);
+            if (!$user) {
+                $this->response->error('User not found', 404);
+                return;
+            }
+
+            // Validate password strength
+            $passwordValidation = Security::validatePasswordStrength($newPassword);
+            if (!empty($passwordValidation)) {
+                $this->response->validationError($passwordValidation, 'Password does not meet strength requirements');
+                return;
+            }
+
+            // Update password
+            $result = User::update($userId, ['password' => $newPassword]);
+
+            if ($result) {
+                $this->response->success([
+                    'user_id' => $userId,
+                    'user_email' => $user->getEmail()
+                ], 'Password changed successfully');
+            } else {
+                $this->response->error('Failed to change password', 500);
+            }
+        } catch (\Exception $e) {
+            Logger::error('Admin password change error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->response->error('Failed to change password', 500);
+        }
+    }
 }

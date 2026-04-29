@@ -28,14 +28,6 @@ class Request
         $this->files = $_FILES;
         $this->body = file_get_contents('php://input') ?? '';
 
-        // Debug: Log request details
-        Logger::log("Request: {$this->method} {$this->uri}");
-        Logger::log("Cookies: " . json_encode($_COOKIE));
-        Logger::log("Headers: " . json_encode([
-            'Cookie' => $this->headers['Cookie'] ?? 'none',
-            'User-Agent' => $this->headers['User-Agent'] ?? 'none'
-        ]));
-
         $this->json = $this->parseJson();
         $this->ip = $this->getClientIp();
         $this->userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';

@@ -384,7 +384,9 @@ class User
             $stmt1 = Database::prepare(
                 "INSERT INTO admin_users (user_id, full_name, email, assigned_at) VALUES (?, ?, ?, NOW())"
             );
-            $stmt1->bind_param('iss', $userId, $user->getFullName(), $user->getEmail());
+            $fullName = $user->getFullName();
+            $email = $user->getEmail();
+            $stmt1->bind_param('iss', $userId, $fullName, $email);
             $stmt1->execute();
 
             // Update user role

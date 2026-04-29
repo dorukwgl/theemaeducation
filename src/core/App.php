@@ -138,11 +138,9 @@ class App
             // 1. Request has existing EMA_SESSION cookie (resume session)
             // 2. OR it's an auth endpoint (create new session)
             if (!isset($_COOKIE['EMA_SESSION']) && !$this->isAuthEndpoint()) {
-                Logger::log("App: No EMA_SESSION cookie and not auth endpoint, skipping session start");
                 return;
             }
 
-            Logger::log("App: Starting session (auth endpoint: " . ($this->isAuthEndpoint() ? 'yes' : 'no') . ", has cookie: " . (isset($_COOKIE['EMA_SESSION']) ? 'yes' : 'no') . ")");
             session_start();
         }
     }

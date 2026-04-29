@@ -37,10 +37,6 @@ class FileController
         try {
             // Validate CSRF token
             $data = $this->request->allInput();
-            if (!$this->validateCsrfToken($data)) {
-                $this->response->error('Invalid CSRF token', 403);
-                return;
-            }
 
             // Validate folder_id
             if (!isset($data['folder_id'])) {
@@ -159,10 +155,6 @@ class FileController
         try {
             // Validate CSRF token
             $data = $this->request->allInput();
-            if (!$this->validateCsrfToken($data)) {
-                $this->response->error('Invalid CSRF token', 403);
-                return;
-            }
 
             // Check if file exists
             $file = File::findById($id);
@@ -362,17 +354,6 @@ class FileController
         } catch (\Exception $e) {
             $this->response->error('Failed to download file', 500);
         }
-    }
-
-    /**
-     * Validate CSRF token
-     * @param array $data Request data
-     * @return bool true if valid, false otherwise
-     */
-    private function validateCsrfToken(array $data): bool
-    {
-        $token = $data['csrf_token'] ?? null;
-        return Security::verifyCsrfToken($token);
     }
 
     /**

@@ -182,7 +182,7 @@ class NoticeController
                         $data = $request->all();
 
             // Validate CSRF token
-            if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
+            if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
                 Response::json([
                     'success' => false,
                     'message' => 'Invalid CSRF token'
@@ -297,7 +297,7 @@ class NoticeController
                         $data = $request->all();
 
             // Validate CSRF token
-            if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
+            if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
                 Response::json([
                     'success' => false,
                     'message' => 'Invalid CSRF token'
@@ -386,7 +386,7 @@ class NoticeController
                         $data = $request->all();
 
             // Validate CSRF token
-            if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
+            if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
                 Response::json([
                     'success' => false,
                     'message' => 'Invalid CSRF token'
@@ -458,7 +458,7 @@ class NoticeController
                         $data = $request->all();
 
             // Validate CSRF token
-            if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
+            if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
                 Response::json([
                     'success' => false,
                     'message' => 'Invalid CSRF token'
@@ -553,7 +553,7 @@ class NoticeController
                         $data = $request->all();
 
             // Validate CSRF token
-            if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
+            if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
                 Response::json([
                     'success' => false,
                     'message' => 'Invalid CSRF token'
@@ -688,7 +688,7 @@ class NoticeController
                         $data = $request->all();
 
             // Validate CSRF token
-            if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
+            if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
                 Response::json([
                     'success' => false,
                     'message' => 'Invalid CSRF token'
@@ -861,7 +861,7 @@ class NoticeController
                         $data = $request->all();
 
             // Validate CSRF token
-            if (!Security::verifyCsrfToken($data['_csrf_token'] ?? '')) {
+            if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
                 Response::json([
                     'success' => false,
                     'message' => 'Invalid CSRF token'

@@ -76,12 +76,6 @@ class FolderController
 
             $data = $this->request->allInput();
 
-            // Validate CSRF token
-            if (!$this->validateCsrfToken($data)) {
-                $this->response->error('Invalid CSRF token', 403);
-                return;
-            }
-
             // Validate input
             $validation = Validator::make($data, [
                 'name' => 'required|min:2|max:255'
@@ -229,12 +223,6 @@ class FolderController
 
             $data = $this->request->allInput();
 
-            // Validate CSRF token
-            if (!$this->validateCsrfToken($data)) {
-                $this->response->error('Invalid CSRF token', 403);
-                return;
-            }
-
             // Validate input
             $validation = Validator::make($data, [
                 'name' => 'nullable|min:2|max:255'
@@ -327,17 +315,6 @@ class FolderController
             ]);
             $this->response->error('Failed to delete folder', 500);
         }
-    }
-
-    /**
-     * Validate CSRF token
-     * @param array $data Request data
-     * @return bool true if valid, false otherwise
-     */
-    private function validateCsrfToken(array $data): bool
-    {
-        $token = $data['csrf_token'] ?? null;
-        return Security::verifyCsrfToken($token);
     }
 
     /**
