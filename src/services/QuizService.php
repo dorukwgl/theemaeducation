@@ -257,8 +257,7 @@ class QuizService
     {
         try {
             // Get attempt details
-            $db = \EMA\Config\Database::getInstance();
-            $stmt = $db->prepare("
+            $stmt = \EMA\Config\Database::prepare("
                 SELECT id, quiz_set_id, user_id, started_at, completed_at
                 FROM quiz_attempts
                 WHERE id = ? LIMIT 1
@@ -280,7 +279,7 @@ class QuizService
             $stmt->close();
 
             // Get all results for this attempt
-            $stmt = $db->prepare("
+            $stmt = \EMA\Config\Database::prepare("
                 SELECT qr.question_id, qr.user_answer, qr.is_correct, q.correct_answer
                 FROM quiz_results qr
                 JOIN questions q ON qr.question_id = q.id
@@ -320,11 +319,11 @@ class QuizService
 
             // Calculate time spent
             $startedAt = strtotime($attempt['started_at']);
-            $completedAt = $completedAt ? strtotime($attempt['completed_at']) : time();
+            $completedAt = $attempt['completed_at'] ? strtotime($attempt['completed_at']) : time();
             $timeSpentSeconds = $completedAt - $startedAt;
 
             // Update attempt record
-            $stmt = $db->prepare("
+            $stmt = \EMA\Config\Database::prepare("
                 UPDATE quiz_attempts
                 SET score = ?, correct_answers = ?, time_spent_seconds = ?, completed_at = COALESCE(completed_at, NOW())
                 WHERE id = ?
@@ -411,10 +410,8 @@ class QuizService
                     break;
             }
 
-            $db = \EMA\Config\Database::getInstance();
-
             // Get attempt frequency
-            $stmt = $db->prepare("
+            $stmt = \EMA\Config\Database::prepare("
                 SELECT
                     COUNT(*) as total_attempts,
                     COUNT(DISTINCT user_id) as unique_users,
@@ -430,7 +427,7 @@ class QuizService
             $stmt->close();
 
             // Get completion rate
-            $stmt = $db->prepare("
+            $stmt = \EMA\Config\Database::prepare("
                 SELECT
                     SUM(CASE WHEN completed_at IS NOT NULL THEN 1 ELSE 0 END) as completed_attempts,
                     COUNT(*) as total_attempts_started
@@ -443,7 +440,7 @@ class QuizService
             $stmt->close();
 
             // Get time spent distribution
-            $stmt = $db->prepare("
+            $stmt = \EMA\Config\Database::prepare("
                 SELECT
                     AVG(time_spent_seconds) as average_time,
                     MIN(time_spent_seconds) as fastest_time,
@@ -457,7 +454,7 @@ class QuizService
             $stmt->close();
 
             // Get most missed questions
-            $stmt = $db->prepare("
+            $stmt = \EMA\Config\Database::prepare("
                 SELECT
                     qr.question_id,
                     COUNT(*) as times_answered,
@@ -729,8 +726,7 @@ class QuizService
     private function logQuizActivity(int $quizSetId, ?int $userId, string $action, ?array $details = null): void
     {
         try {
-            $db = \EMA\Config\Database::getInstance();
-            $stmt = $db->prepare("
+            $stmt = \EMA\Config\Database::prepare("
                 INSERT INTO quiz_activity (quiz_set_id, user_id, action, details, ip_address)
                 VALUES (?, ?, ?, ?, ?)
             ");
