@@ -1,0 +1,2 @@
+[2026-04-30T08:03:38.373957+00:00] stack.INFO: handleIconUpload - Starting {"iconData":"folders/folder_5c23acd1df6f57146b6e07742c05d2c7.jpeg"} []
+[2026-04-30T08:03:38.375307+00:00] stack.INFO: handleIconUpload - Failed: Invalid icon data format [] []

@@ -188,15 +188,24 @@ class Folder
                 $iconPath = $data['icon_path'];
 
                 // Delete old icon if exists
-                if ($folder['icon_path'] && file_exists(ROOT_PATH . '/' . $folder['icon_path'])) {
-                    unlink(ROOT_PATH . '/' . $folder['icon_path']);
+                if ($folder['icon_path']) {
+                    $oldIconPath = ROOT_PATH . '/uploads/' . $folder['icon_path']; // Add uploads/ prefix for file system
+                    if (file_exists($oldIconPath)) {
+                        unlink($oldIconPath);
+                    }
                 }
 
-                // Handle new icon upload
+                // Handle new icon
                 if ($iconPath) {
-                    $iconPath = self::handleIconUpload($iconPath);
-                    if (!$iconPath) {
-                        return false;
+                    // If iconPath is already a processed path (starts with folders/), use it directly
+                    if (is_string($iconPath) && strpos($iconPath, 'folders/') === 0) {
+                        // Use the already processed path
+                    } else {
+                        // Otherwise, treat as new upload
+                        $iconPath = self::handleIconUpload($iconPath);
+                        if (!$iconPath) {
+                            return false;
+                        }
                     }
                 }
 
