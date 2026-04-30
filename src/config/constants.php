@@ -25,10 +25,20 @@ class Constants
     // Access Types
     public const ACCESS_ALL = 'all';
     public const ACCESS_LOGGED_IN = 'logged_in';
+    public const ACCESS_PRIVATE = 'private';
 
     // Item Types
     public const ITEM_TYPE_FILE = 'file';
     public const ITEM_TYPE_QUIZ_SET = 'quiz_set';
+
+    // Item Status
+    // File Status
+    public const STATUS_ACTIVE = 'active';
+    public const STATUS_INACTIVE = 'inactive';
+    // Quiz Set Status
+    public const STATUS_PUBLISHED = 'published';
+    public const STATUS_DRAFT = 'draft';
+    public const STATUS_ARCHIVED = 'archived';
 
     // Question Types
     public const QUESTION_TYPE_READING = 'Reading';

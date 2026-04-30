@@ -4,6 +4,7 @@ namespace EMA\Controllers;
 
 use EMA\Models\File;
 use EMA\Models\Folder;
+use EMA\Utils\Validator;
 use EMA\Utils\Logger;
 use EMA\Core\Request;
 use EMA\Core\Response;
@@ -540,9 +541,22 @@ class FileController
             }
 
             // Extract pagination parameters
-            $pagination = \EMA\Utils\Pagination::extractFromRequest($this->request);
-            $page = array_key_exists('page', $pagination) ? $pagination['page'] : 1;
-            $perPage = array_key_exists('per_page', $pagination) ? $pagination['per_page'] : 10;
+            $page = (int) ($this->request->getQueryParameter('page', 1));
+            $perPage = (int) ($this->request->getQueryParameter('per_page', 20));
+
+            // Validate pagination parameters
+            $validation = Validator::make([
+                'page' => $page,
+                'per_page' => $perPage
+            ], [
+                'page' => 'integer|min:1',
+                'per_page' => 'integer|between:1,100'
+            ]);
+
+            if (!$validation->validate()) {
+                $this->response->validationError($validation->getErrors(), 'Invalid pagination parameters');
+                return;
+            }
 
             // Extract optional filters
             $search = $this->request->getQueryParameter('search');
@@ -605,15 +619,13 @@ class FileController
                 return;
             }
 
-            Logger::log("file: " . json_encode($file));
-
             $data = $this->request->allInput();
+            Logger::log("data: " . json_encode($data));
+            
             if (empty($data) && !isset($_FILES['file']) && !isset($_FILES['icon'])) {
                 $this->response->error('No data provided', 400);
                 return;
             }
-
-            Logger::log("data: " . json_encode($this->request->allJsonParameters()));
 
             // Handle file upload if present
             if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {

@@ -69,7 +69,7 @@ $router->delete('/api/folders/{id}', [FolderController::class, 'delete'], [AuthM
 
 // File routes
 $router->post('/api/files/upload', [FileController::class, 'upload'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
-$router->put('/api/files/{id}', [FileController::class, 'update'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
+$router->post('/api/files/{id}', [FileController::class, 'update'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
 $router->delete('/api/files/{id}', [FileController::class, 'delete'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
 $router->get('/api/files/{id}/download', [FileController::class, 'download'], [AuthMiddleware::class]);
 $router->get('/api/folders/{id}/files', [FileController::class, 'folderFiles'], [AuthMiddleware::class]);

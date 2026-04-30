@@ -5,6 +5,7 @@ namespace EMA\Models;
 use EMA\Utils\Validator;
 use EMA\Utils\Logger;
 use EMA\Utils\Security;
+use EMA\Config\Constants;
 
 class File
 {
@@ -17,7 +18,7 @@ class File
     {
         try {
             $query = "
-                SELECT f.id, f.folder_id, f.name, f.file_path, f.icon_path, f.access_type,
+                SELECT f.id, f.folder_id, f.name, f.file_path, f.icon_path, f.access_type, f.status,
                        fl.name as folder_name, fl.icon_path as folder_icon_path
                 FROM files f
                 LEFT JOIN folders fl ON f.folder_id = fl.id
@@ -44,6 +45,7 @@ class File
                 'file_path' => $file['file_path'],
                 'icon_path' => $file['icon_path'],
                 'access_type' => $file['access_type'],
+                'status' => $file['status'],
                 'folder_name' => $file['folder_name'],
                 'folder_icon_path' => $file['folder_icon_path']
             ];
@@ -60,7 +62,7 @@ class File
 
     /**
      * Create file record
-     * @param array $data File data (folder_id, name, file_path, icon_path, access_type)
+     * @param array $data File data (folder_id, name, file_path, icon_path, access_type, status)
      * @return int|false New file ID or false on failure
      */
     public static function create(array $data): int|false
@@ -75,7 +77,8 @@ class File
             $name = trim($data['name']);
             $filePath = $data['file_path'];
             $iconPath = $data['icon_path'] ?? null;
-            $accessType = $data['access_type'] ?? 'logged_in';
+            $accessType = $data['access_type'] ?? Constants::ACCESS_LOGGED_IN;
+            $status = $data['status'] ?? Constants::STATUS_ACTIVE;
 
             // Validate folder exists
             $folder = \EMA\Models\Folder::findById($folderId);
@@ -84,14 +87,25 @@ class File
             }
 
             // Validate access_type
-            if (!in_array($accessType, ['all', 'logged_in'])) {
+            $validAccessTypes = [
+                Constants::ACCESS_ALL,
+                Constants::ACCESS_LOGGED_IN,
+                Constants::ACCESS_PRIVATE
+            ];
+            if (!in_array($accessType, $validAccessTypes)) {
+                return false;
+            }
+
+            // Validate status
+            $validStatuses = [Constants::STATUS_ACTIVE, Constants::STATUS_INACTIVE];
+            if (!in_array($status, $validStatuses)) {
                 return false;
             }
 
             // Insert file
-            $query = "INSERT INTO files (folder_id, name, file_path, icon_path, access_type) VALUES (?, ?, ?, ?, ?)";
+            $query = "INSERT INTO files (folder_id, name, file_path, icon_path, access_type, status) VALUES (?, ?, ?, ?, ?, ?)";
             $stmt = \EMA\Config\Database::prepare($query);
-            $stmt->bind_param('issss', $folderId, $name, $filePath, $iconPath, $accessType);
+            $stmt->bind_param('isssss', $folderId, $name, $filePath, $iconPath, $accessType, $status);
 
             if ($stmt->execute()) {
                 $fileId = $stmt->insert_id;
@@ -186,13 +200,33 @@ class File
                 $accessType = $data['access_type'];
 
                 // Validate access_type
-                if (!in_array($accessType, ['all', 'logged_in'])) {
+                $validAccessTypes = [
+                    Constants::ACCESS_ALL,
+                    Constants::ACCESS_LOGGED_IN,
+                    Constants::ACCESS_PRIVATE
+                ];
+                if (!in_array($accessType, $validAccessTypes)) {
                     return false;
                 }
 
                 $updates[] = 'access_type = ?';
                 $types .= 's';
                 $params[] = $accessType;
+            }
+
+            // Handle status update
+            if (isset($data['status'])) {
+                $status = $data['status'];
+
+                // Validate status
+                $validStatuses = [Constants::STATUS_ACTIVE, Constants::STATUS_INACTIVE];
+                if (!in_array($status, $validStatuses)) {
+                    return false;
+                }
+
+                $updates[] = 'status = ?';
+                $types .= 's';
+                $params[] = $status;
             }
 
             if (empty($updates)) {
@@ -308,22 +342,31 @@ class File
                 return false;
             }
 
+            // Check file status - inactive files are not accessible
+            if ($file['status'] !== Constants::STATUS_ACTIVE) {
+                return false;
+            }
+
             // Check file access_type
             $accessType = $file['access_type'];
 
             // Public access (all)
-            if ($accessType === 'all') {
+            if ($accessType === Constants::ACCESS_ALL) {
                 return true;
             }
 
             // Logged-in access
-            if ($accessType === 'logged_in') {
+            if ($accessType === Constants::ACCESS_LOGGED_IN) {
                 // User must be authenticated (checked by caller)
                 return true;
             }
 
-            // Check individual permissions via Access model
-            return \EMA\Models\Access::checkAccess($userId, $fileId, 'file');
+            // Private access - check individual permissions via Access model
+            if ($accessType === Constants::ACCESS_PRIVATE) {
+                return \EMA\Models\Access::checkAccess($userId, $fileId, 'file');
+            }
+
+            return false;
         } catch (\Exception $e) {
             Logger::error('Error checking file access', [
                 'user_id' => $userId,
@@ -351,7 +394,7 @@ class File
             $query = "
                 SELECT COUNT(DISTINCT identifier) as user_count,
                        SUM(times_accessed) as total_accesses,
-                       MAX(created_at) as last_access
+                       MAX(granted_at) as last_access
                 FROM access_permissions
                 WHERE item_id = ? AND item_type = 'file' AND is_active = 1
             ";
@@ -368,10 +411,12 @@ class File
                 'file_id' => $fileId,
                 'file_name' => $file['name'],
                 'access_type' => $file['access_type'],
+                'status' => $file['status'],
                 'users_with_access' => (int) ($stats['user_count'] ?? 0),
                 'total_downloads' => (int) ($stats['total_accesses'] ?? 0),
                 'last_access' => $stats['last_access'] ?? null,
-                'is_public' => $file['access_type'] === 'all'
+                'is_public' => $file['access_type'] === Constants::ACCESS_ALL,
+                'is_active' => $file['status'] === Constants::STATUS_ACTIVE
             ];
 
             return $statistics;
@@ -388,9 +433,10 @@ class File
      * Get files by folder with optional user access filtering
      * @param int $folderId Folder ID
      * @param int|null $userId Optional User ID for access filtering
+     * @param bool $includeInactive Include inactive files (default: false)
      * @return array Array of files with access information
      */
-    public static function getFilesByFolder(int $folderId, ?int $userId = null): array
+    public static function getFilesByFolder(int $folderId, ?int $userId = null, bool $includeInactive = false): array
     {
         try {
             // Check if folder exists
@@ -401,7 +447,7 @@ class File
             // Build query based on user filter
             if ($userId) {
                 $query = "
-                    SELECT f.id, f.name, f.file_path, f.icon_path, f.access_type,
+                    SELECT f.id, f.name, f.file_path, f.icon_path, f.access_type, f.status,
                            ap.times_accessed, ap.access_times, ap.is_active,
                            CASE WHEN ap.access_times = 0 THEN 'unlimited'
                                 ELSE CAST(ap.access_times - ap.times_accessed AS SIGNED) END as remaining_accesses
@@ -409,21 +455,41 @@ class File
                     LEFT JOIN access_permissions ap ON f.id = ap.item_id AND ap.item_type = 'file'
                         AND ap.identifier = CONCAT('user_', ?)
                     WHERE f.folder_id = ?
-                    ORDER BY f.id DESC
                 ";
 
+                if (!$includeInactive) {
+                    $query .= " AND f.status = ?";
+                }
+
+                $query .= " ORDER BY f.id DESC";
+
                 $stmt = \EMA\Config\Database::prepare($query);
-                $stmt->bind_param('ii', $userId, $folderId);
+                if (!$includeInactive) {
+                    $activeStatus = Constants::STATUS_ACTIVE;
+                    $stmt->bind_param('iis', $userId, $folderId, $activeStatus);
+                } else {
+                    $stmt->bind_param('ii', $userId, $folderId);
+                }
             } else {
                 $query = "
-                    SELECT f.id, f.name, f.file_path, f.icon_path, f.access_type
+                    SELECT f.id, f.name, f.file_path, f.icon_path, f.access_type, f.status
                     FROM files f
                     WHERE f.folder_id = ?
-                    ORDER BY f.id DESC
                 ";
 
+                if (!$includeInactive) {
+                    $query .= " AND f.status = ?";
+                }
+
+                $query .= " ORDER BY f.id DESC";
+
                 $stmt = \EMA\Config\Database::prepare($query);
-                $stmt->bind_param('i', $folderId);
+                if (!$includeInactive) {
+                    $activeStatus = Constants::STATUS_ACTIVE;
+                    $stmt->bind_param('is', $folderId, $activeStatus);
+                } else {
+                    $stmt->bind_param('i', $folderId);
+                }
             }
 
             $stmt->execute();
@@ -436,7 +502,8 @@ class File
                     'name' => $row['name'],
                     'file_path' => $row['file_path'],
                     'icon_path' => $row['icon_path'],
-                    'access_type' => $row['access_type']
+                    'access_type' => $row['access_type'],
+                    'status' => $row['status']
                 ];
 
                 // Add access information if user provided
@@ -470,9 +537,10 @@ class File
      * @param string|null $search Optional search term for file names
      * @param string|null $accessType Optional access type filter
      * @param int|null $userId Optional User ID for access filtering (null = admin/all files)
+     * @param bool $includeInactive Include inactive files (default: false)
      * @return array Paginated files with metadata
      */
-    public static function getFilesByFolderPaginated(int $folderId, int $page, int $perPage, ?string $search = null, ?string $accessType = null, ?int $userId = null): array
+    public static function getFilesByFolderPaginated(int $folderId, int $page, int $perPage, ?string $search = null, ?string $accessType = null, ?int $userId = null, bool $includeInactive = false): array
     {
         try {
             if (!\EMA\Models\Folder::findById($folderId)) {
@@ -480,7 +548,7 @@ class File
             }
 
             $query = "
-                SELECT f.id, f.name, f.file_path, f.icon_path, f.access_type, f.created_at,
+                SELECT f.id, f.name, f.file_path, f.icon_path, f.access_type, f.status, f.created_at,
                        fl.name as folder_name, fl.icon_path as folder_icon_path
                 FROM files f
                 LEFT JOIN folders fl ON f.folder_id = fl.id
@@ -496,16 +564,23 @@ class File
                 $types .= 's';
             }
 
-            if ($accessType && in_array($accessType, ['all', 'logged_in'])) {
+            if ($accessType && in_array($accessType, [Constants::ACCESS_ALL, Constants::ACCESS_LOGGED_IN, Constants::ACCESS_PRIVATE])) {
                 $query .= " AND f.access_type = ?";
                 $params[] = $accessType;
                 $types .= 's';
             }
 
+            if (!$includeInactive) {
+                $query .= " AND f.status = ?";
+                $activeStatus = Constants::STATUS_ACTIVE;
+                $params[] = $activeStatus;
+                $types .= 's';
+            }
+
             if ($userId !== null) {
                 $query .= " AND (
-                    f.access_type = 'all'
-                    OR f.access_type = 'logged_in'
+                    f.access_type = ?
+                    OR f.access_type = ?
                     OR f.id IN (
                         SELECT ap.item_id
                         FROM access_permissions ap
@@ -515,8 +590,12 @@ class File
                         AND (ap.access_times = 0 OR ap.times_accessed < ap.access_times)
                     )
                 )";
+                $accessAll = Constants::ACCESS_ALL;
+                $accessLoggedIn = Constants::ACCESS_LOGGED_IN;
+                $params[] = $accessAll;
+                $params[] = $accessLoggedIn;
                 $params[] = $userId;
-                $types .= 'i';
+                $types .= 'ssi';
             }
 
             $offset = \EMA\Utils\Pagination::getOffset($page, $perPage);
@@ -538,6 +617,7 @@ class File
                     'file_path' => $row['file_path'],
                     'icon_path' => $row['icon_path'],
                     'access_type' => $row['access_type'],
+                    'status' => $row['status'],
                     'created_at' => $row['created_at'],
                     'folder_name' => $row['folder_name'],
                     'folder_icon_path' => $row['folder_icon_path']
@@ -546,7 +626,7 @@ class File
 
             $stmt->close();
 
-            $total = self::getFilesByFolderCount($folderId, $search, $accessType, $userId);
+            $total = self::getFilesByFolderCount($folderId, $search, $accessType, $userId, $includeInactive);
             $pagination = \EMA\Utils\Pagination::getMetadata($page, $perPage, $total);
 
             return [
@@ -576,9 +656,10 @@ class File
      * @param string|null $search Optional search term for file names
      * @param string|null $accessType Optional access type filter
      * @param int|null $userId Optional User ID for access filtering (null = admin/all files)
+     * @param bool $includeInactive Include inactive files (default: false)
      * @return int Total count of matching files
      */
-    public static function getFilesByFolderCount(int $folderId, ?string $search = null, ?string $accessType = null, ?int $userId = null): int
+    public static function getFilesByFolderCount(int $folderId, ?string $search = null, ?string $accessType = null, ?int $userId = null, bool $includeInactive = false): int
     {
         try {
             $query = "
@@ -596,16 +677,23 @@ class File
                 $types .= 's';
             }
 
-            if ($accessType && in_array($accessType, ['all', 'logged_in'])) {
+            if ($accessType && in_array($accessType, [Constants::ACCESS_ALL, Constants::ACCESS_LOGGED_IN, Constants::ACCESS_PRIVATE])) {
                 $query .= " AND f.access_type = ?";
                 $params[] = $accessType;
                 $types .= 's';
             }
 
+            if (!$includeInactive) {
+                $query .= " AND f.status = ?";
+                $activeStatus = Constants::STATUS_ACTIVE;
+                $params[] = $activeStatus;
+                $types .= 's';
+            }
+
             if ($userId !== null) {
                 $query .= " AND (
-                    f.access_type = 'all'
-                    OR f.access_type = 'logged_in'
+                    f.access_type = ?
+                    OR f.access_type = ?
                     OR f.id IN (
                         SELECT ap.item_id
                         FROM access_permissions ap
@@ -615,8 +703,12 @@ class File
                         AND (ap.access_times = 0 OR ap.times_accessed < ap.access_times)
                     )
                 )";
+                $accessAll = Constants::ACCESS_ALL;
+                $accessLoggedIn = Constants::ACCESS_LOGGED_IN;
+                $params[] = $accessAll;
+                $params[] = $accessLoggedIn;
                 $params[] = $userId;
-                $types .= 'i';
+                $types .= 'ssi';
             }
 
             $stmt = \EMA\Config\Database::prepare($query);
@@ -635,6 +727,232 @@ class File
                 'error' => $e->getMessage()
             ]);
             return 0;
+        }
+    }
+
+    /**
+     * Check if file is active
+     * @param int $fileId File ID
+     * @return bool true if file is active, false otherwise
+     */
+    public static function isFileActive(int $fileId): bool
+    {
+        try {
+            $query = "SELECT status FROM files WHERE id = ? LIMIT 1";
+            $stmt = \EMA\Config\Database::prepare($query);
+            $stmt->bind_param('i', $fileId);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if (!$result->num_rows) {
+                return false;
+            }
+
+            $file = $result->fetch_assoc();
+            $stmt->close();
+
+            return $file['status'] === Constants::STATUS_ACTIVE;
+        } catch (\Exception $e) {
+            Logger::error('Error checking file active status', [
+                'file_id' => $fileId,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Check if file is publicly accessible
+     * @param int $fileId File ID
+     * @return bool true if file is public, false otherwise
+     */
+    public static function isFilePublic(int $fileId): bool
+    {
+        try {
+            $file = self::findById($fileId);
+            if (!$file) {
+                return false;
+            }
+
+            return $file['access_type'] === Constants::ACCESS_ALL && $file['status'] === Constants::STATUS_ACTIVE;
+        } catch (\Exception $e) {
+            Logger::error('Error checking file public status', [
+                'file_id' => $fileId,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Update file status
+     * @param int $fileId File ID
+     * @param string $status New status (active/inactive)
+     * @return bool true if successful, false otherwise
+     */
+    public static function updateStatus(int $fileId, string $status): bool
+    {
+        try {
+            $validStatuses = [Constants::STATUS_ACTIVE, Constants::STATUS_INACTIVE];
+            if (!in_array($status, $validStatuses)) {
+                return false;
+            }
+
+            $query = "UPDATE files SET status = ? WHERE id = ?";
+            $stmt = \EMA\Config\Database::prepare($query);
+            $stmt->bind_param('si', $status, $fileId);
+            $result = $stmt->execute();
+            $stmt->close();
+
+            if ($result) {
+                Logger::log('File status updated', [
+                    'file_id' => $fileId,
+                    'new_status' => $status
+                ]);
+            }
+
+            return $result;
+        } catch (\Exception $e) {
+            Logger::error('Error updating file status', [
+                'file_id' => $fileId,
+                'status' => $status,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Update file access type
+     * @param int $fileId File ID
+     * @param string $accessType New access type (all/logged_in/private)
+     * @return bool true if successful, false otherwise
+     */
+    public static function updateAccessType(int $fileId, string $accessType): bool
+    {
+        try {
+            $validAccessTypes = [
+                Constants::ACCESS_ALL,
+                Constants::ACCESS_LOGGED_IN,
+                Constants::ACCESS_PRIVATE
+            ];
+            if (!in_array($accessType, $validAccessTypes)) {
+                return false;
+            }
+
+            $query = "UPDATE files SET access_type = ? WHERE id = ?";
+            $stmt = \EMA\Config\Database::prepare($query);
+            $stmt->bind_param('si', $accessType, $fileId);
+            $result = $stmt->execute();
+            $stmt->close();
+
+            if ($result) {
+                Logger::log('File access type updated', [
+                    'file_id' => $fileId,
+                    'new_access_type' => $accessType
+                ]);
+            }
+
+            return $result;
+        } catch (\Exception $e) {
+            Logger::error('Error updating file access type', [
+                'file_id' => $fileId,
+                'access_type' => $accessType,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Get public files for unauthenticated access
+     * @param int $folderId Folder ID
+     * @param int $page Page number (1-based)
+     * @param int $perPage Items per page
+     * @return array Paginated public files
+     */
+    public static function getPublicFilesPaginated(int $folderId, int $page, int $perPage): array
+    {
+        try {
+            if (!\EMA\Models\Folder::findById($folderId)) {
+                return [];
+            }
+
+            $query = "
+                SELECT f.id, f.name, f.file_path, f.icon_path, f.access_type, f.status, f.created_at,
+                       fl.name as folder_name, fl.icon_path as folder_icon_path
+                FROM files f
+                LEFT JOIN folders fl ON f.folder_id = fl.id
+                WHERE f.folder_id = ?
+                AND f.access_type = ?
+                AND f.status = ?
+                ORDER BY f.id DESC
+                LIMIT ? OFFSET ?
+            ";
+
+            $offset = \EMA\Utils\Pagination::getOffset($page, $perPage);
+
+            $stmt = \EMA\Config\Database::prepare($query);
+            $accessAll = Constants::ACCESS_ALL;
+            $statusActive = Constants::STATUS_ACTIVE;
+            $stmt->bind_param('issii', $folderId, $accessAll, $statusActive, $perPage, $offset);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            $files = [];
+            while ($row = $result->fetch_assoc()) {
+                $files[] = [
+                    'id' => (int) $row['id'],
+                    'name' => $row['name'],
+                    'file_path' => $row['file_path'],
+                    'icon_path' => $row['icon_path'],
+                    'access_type' => $row['access_type'],
+                    'status' => $row['status'],
+                    'created_at' => $row['created_at'],
+                    'folder_name' => $row['folder_name'],
+                    'folder_icon_path' => $row['folder_icon_path']
+                ];
+            }
+
+            $stmt->close();
+
+            // Count total public files
+            $countQuery = "
+                SELECT COUNT(*) as total
+                FROM files f
+                WHERE f.folder_id = ?
+                AND f.access_type = ?
+                AND f.status = ?
+            ";
+
+            $countStmt = \EMA\Config\Database::prepare($countQuery);
+            $accessAll = Constants::ACCESS_ALL;
+            $statusActive = Constants::STATUS_ACTIVE;
+            $countStmt->bind_param('iss', $folderId, $accessAll, $statusActive);
+            $countStmt->execute();
+            $countResult = $countStmt->get_result();
+            $total = (int) $countResult->fetch_assoc()['total'];
+            $countStmt->close();
+
+            $pagination = \EMA\Utils\Pagination::getMetadata($page, $perPage, $total);
+
+            return [
+                'files' => $files,
+                'pagination' => $pagination,
+                'total' => $total
+            ];
+        } catch (\Exception $e) {
+            Logger::error('Error getting public files paginated', [
+                'folder_id' => $folderId,
+                'page' => $page,
+                'per_page' => $perPage,
+                'error' => $e->getMessage()
+            ]);
+            return [
+                'files' => [],
+                'pagination' => \EMA\Utils\Pagination::getMetadata(1, $perPage, 0),
+                'total' => 0
+            ];
         }
     }
 }

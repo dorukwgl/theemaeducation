@@ -10,8 +10,8 @@ class Access
     /**
      * Check if user has access to an item
      * @param int $userId User ID to check
-     * @param int $itemId File or quiz set ID
-     * @param string $itemType 'file' or 'quiz_set'
+     * @param int $itemId File, quiz set or folder ID
+     * @param string $itemType 'file', 'quiz_set' or 'folder'
      * @return bool true if user has access, false otherwise
      */
     public static function checkAccess(int $userId, int $itemId, string $itemType): bool
@@ -22,8 +22,18 @@ class Access
                 return true;
             }
 
-            // Get item access_type
-            $table = $itemType === 'file' ? 'files' : 'quiz_sets';
+            // Map item type to table name and check if supported
+            $tableMap = [
+                'file' => 'files',
+                'quiz_set' => 'quiz_sets',
+                'folder' => 'folders'
+            ];
+
+            if (!array_key_exists($itemType, $tableMap)) {
+                return false; // Unsupported item type
+            }
+
+            $table = $tableMap[$itemType];
             $stmt = Database::prepare("SELECT access_type FROM $table WHERE id = ? LIMIT 1");
             $stmt->bind_param('i', $itemId);
             $stmt->execute();
@@ -91,28 +101,67 @@ class Access
     /**
      * Grant user access to an item
      * @param int $userId User ID to grant access to
-     * @param int $itemId File or quiz set ID
-     * @param string $itemType 'file' or 'quiz_set'
+     * @param int $itemId File, quiz set or folder ID
+     * @param string $itemType 'file', 'quiz_set' or 'folder'
      * @param int $accessTimes Number of allowed accesses (0 = unlimited)
      * @return bool true if successful, false otherwise
      */
     public static function grantAccess(int $userId, int $itemId, string $itemType, int $accessTimes = 0): bool
     {
         try {
+            Logger::log('Access::grantAccess called', [
+                'user_id' => $userId,
+                'item_id' => $itemId,
+                'item_type' => $itemType,
+                'access_times' => $accessTimes
+            ]);
+
             // Check if user exists
             $user = User::findById($userId);
+            Logger::log('Access::grantAccess - User check', [
+                'user_id' => $userId,
+                'user_found' => $user !== null
+            ]);
             if (!$user) {
+                Logger::error('Access::grantAccess - User not found', [
+                    'user_id' => $userId
+                ]);
                 return false;
             }
 
+            // Map item type to table name and check if supported
+            $tableMap = [
+                'file' => 'files',
+                'quiz_set' => 'quiz_sets',
+                'folder' => 'folders'
+            ];
+
+            if (!array_key_exists($itemType, $tableMap)) {
+                Logger::error('Access::grantAccess - Unsupported item type', [
+                    'item_type' => $itemType
+                ]);
+                return false;
+            }
+
+            $table = $tableMap[$itemType];
+
             // Check if item exists
-            $table = $itemType === 'file' ? 'files' : 'quiz_sets';
             $stmt = Database::prepare("SELECT id FROM $table WHERE id = ? LIMIT 1");
             $stmt->bind_param('i', $itemId);
             $stmt->execute();
             $stmt->store_result();
 
+            Logger::log('Access::grantAccess - Item check', [
+                'item_id' => $itemId,
+                'item_type' => $itemType,
+                'item_found' => $stmt->num_rows > 0
+            ]);
+
             if (!$stmt->num_rows) {
+                Logger::error('Access::grantAccess - Item not found', [
+                    'item_id' => $itemId,
+                    'item_type' => $itemType
+                ]);
                 return false;
             }
 
@@ -127,6 +176,13 @@ class Access
             $stmt->execute();
             $stmt->store_result();
 
+            Logger::log('Access::grantAccess - Existing permission check', [
+                'identifier' => $identifier,
+                'item_id' => $itemId,
+                'item_type' => $itemType,
+                'existing_permission' => $stmt->num_rows > 0
+            ]);
+
             // Start transaction
             Database::beginTransaction();
 
@@ -138,6 +194,12 @@ class Access
                      WHERE identifier = ? AND item_id = ? AND item_type = ?"
                 );
                 $stmt->bind_param('isis', $accessTimes, $identifier, $itemId, $itemType);
+                Logger::log('Access::grantAccess - Updating existing permission', [
+                    'access_times' => $accessTimes,
+                    'identifier' => $identifier,
+                    'item_id' => $itemId,
+                    'item_type' => $itemType
+                ]);
             } else {
                 // Insert new permission
                 $stmt = Database::prepare(
@@ -146,19 +208,37 @@ class Access
                      VALUES (?, 0, ?, ?, ?, 0, 1)"
                 );
                 $stmt->bind_param('sisi', $identifier, $itemId, $itemType, $accessTimes);
+                Logger::log('Access::grantAccess - Inserting new permission', [
+                    'identifier' => $identifier,
+                    'item_id' => $itemId,
+                    'item_type' => $itemType,
+                    'access_times' => $accessTimes
+                ]);
             }
 
             $result = $stmt->execute();
+            Logger::log('Access::grantAccess - Statement execute result', [
+                'success' => $result !== false,
+                'error' => $stmt->error ?? 'no error'
+            ]);
 
             // Commit transaction
-            Database::commit();
+            $commitResult = Database::commit();
+            Logger::log('Access::grantAccess - Transaction commit', [
+                'success' => $commitResult
+            ]);
 
             if ($result) {
-                Logger::info('Access granted', [
+                Logger::log('Access granted', [
                     'user_id' => $userId,
                     'item_id' => $itemId,
                     'item_type' => $itemType,
                     'access_times' => $accessTimes
+                ]);
+            } else {
+                Logger::error('Access::grantAccess - Statement execution failed', [
+                    'error' => $stmt->error ?? 'unknown error',
+                    'errno' => $stmt->errno ?? 0
                 ]);
             }
 
@@ -195,7 +275,7 @@ class Access
             $result = $stmt->execute();
 
             if ($result && $stmt->affected_rows > 0) {
-                Logger::info('Access revoked', [
+                Logger::log('Access revoked', [
                     'user_id' => $userId,
                     'item_id' => $itemId,
                     'item_type' => $itemType
@@ -260,7 +340,7 @@ class Access
                 $result = $stmt->execute();
 
                 if ($result) {
-                    Logger::info('Access incremented (unlimited)', [
+                    Logger::log('Access incremented (unlimited)', [
                         'user_id' => $userId,
                         'item_id' => $itemId,
                         'item_type' => $itemType,
@@ -273,7 +353,7 @@ class Access
 
             // Check if limit not exceeded
             if ($permission['times_accessed'] >= $permission['access_times']) {
-                Logger::info('Access limit reached', [
+                Logger::log('Access limit reached', [
                     'user_id' => $userId,
                     'item_id' => $itemId,
                     'item_type' => $itemType,
@@ -293,7 +373,7 @@ class Access
             $result = $stmt->execute();
 
             if ($result) {
-                Logger::info('Access incremented', [
+                Logger::log('Access incremented', [
                     'user_id' => $userId,
                     'item_id' => $itemId,
                     'item_type' => $itemType,
@@ -430,7 +510,7 @@ class Access
             Database::commit();
 
             if ($result) {
-                Logger::info('Public access ' . ($grant ? 'granted' : 'revoked'), [
+                Logger::log('Public access ' . ($grant ? 'granted' : 'revoked'), [
                     'item_id' => $itemId,
                     'item_type' => $itemType,
                     'folder_id' => $folderId
@@ -514,7 +594,7 @@ class Access
             Database::commit();
 
             if ($result) {
-                Logger::info('Logged-in access ' . ($grant ? 'granted' : 'revoked'), [
+                Logger::log('Logged-in access ' . ($grant ? 'granted' : 'revoked'), [
                     'item_id' => $itemId,
                     'item_type' => $itemType,
                     'folder_id' => $folderId

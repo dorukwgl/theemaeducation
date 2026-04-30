@@ -9,22 +9,119 @@ use EMA\Utils\Security;
 class Folder
 {
     /**
+     * Interpolate query parameters for debugging
+     * @param string $query The SQL query with placeholders
+     * @param array $params The parameters to bind
+     * @param string $types The parameter types string
+     * @return string The interpolated query
+     */
+    private static function interpolateQuery(string $query, array $params, string $types): string
+    {
+        $parts = explode('?', $query);
+        $result = '';
+        $paramIndex = 0;
+
+        foreach ($parts as $i => $part) {
+            $result .= $part;
+            if ($i < count($parts) - 1 && isset($params[$paramIndex])) {
+                $type = $types[$paramIndex] ?? 's';
+                $param = $params[$paramIndex];
+
+                switch ($type) {
+                    case 'i':
+                        $result .= (int) $param;
+                        break;
+                    case 'd':
+                        $result .= (float) $param;
+                        break;
+                    case 's':
+                    default:
+                        $result .= "'" . addslashes((string) $param) . "'";
+                        break;
+                }
+                $paramIndex++;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Get all folders with file counts
      * @return array Array of folders with file counts
      */
-    public static function getAllFolders(): array
-    {
+    public static function getAllFolders(
+        int $page = 1,
+        int $perPage = 20,
+        ?string $search = null,
+        string $sortBy = 'id',
+        string $sortOrder = 'DESC'
+    ): array {
         try {
-            $query = "
-                SELECT f.id, f.name, f.icon_path,
+            // Validate pagination parameters
+            $page = max(1, $page);
+            $perPage = min(100, max(1, $perPage));
+
+            // Validate sort field
+            $allowedSortFields = ['id', 'name', 'created_at'];
+            if (!in_array($sortBy, $allowedSortFields)) {
+                $sortBy = 'id';
+            }
+
+            // Validate sort order
+            $sortOrder = strtoupper($sortOrder) === 'ASC' ? 'ASC' : 'DESC';
+
+            // Build WHERE clause
+            $where = ['1=1'];
+            $types = '';
+            $params = [];
+
+            // Add search condition
+            if ($search && strlen($search) >= 2) {
+                $where[] = 'name LIKE ?';
+                $searchParam = '%' . $search . '%';
+                $types .= 's';
+                $params[] = $searchParam;
+            }
+
+            $whereClause = implode(' AND ', $where);
+
+            // Get total count
+            $countSql = "SELECT COUNT(*) as total FROM folders WHERE $whereClause";
+            $countStmt = \EMA\Config\Database::prepare($countSql);
+            if (!empty($params)) {
+                $countStmt->bind_param($types, ...$params);
+            }
+            $countStmt->execute();
+            $countResult = $countStmt->get_result();
+            $total = $countResult->fetch_assoc()['total'];
+
+            // Calculate pagination
+            $offset = ($page - 1) * $perPage;
+            $lastPage = (int) ceil($total / $perPage);
+
+            // Get folders with file count
+            $sql = "
+                SELECT f.id, f.name, f.icon_path, f.created_at,
                        COUNT(fl.id) as file_count
                 FROM folders f
                 LEFT JOIN files fl ON f.id = fl.folder_id
+                WHERE $whereClause
                 GROUP BY f.id
-                ORDER BY f.id DESC
+                ORDER BY f.$sortBy $sortOrder
+                LIMIT ? OFFSET ?
             ";
+            $stmt = \EMA\Config\Database::prepare($sql);
+            $types .= 'ii';
+            $params[] = $perPage;
+            $params[] = $offset;
 
-            $result = \EMA\Config\Database::query($query);
+            if (!empty($params)) {
+                $stmt->bind_param($types, ...$params);
+            }
+
+            $stmt->execute();
+            $result = $stmt->get_result();
 
             $folders = [];
             while ($row = $result->fetch_assoc()) {
@@ -32,17 +129,34 @@ class Folder
                     'id' => (int) $row['id'],
                     'name' => $row['name'],
                     'icon_path' => $row['icon_path'],
-                    'file_count' => (int) $row['file_count']
+                    'file_count' => (int) $row['file_count'],
+                    'created_at' => $row['created_at']
                 ];
             }
 
-            return $folders;
+            return [
+                'folders' => $folders,
+                'pagination' => [
+                    'total' => (int) $total,
+                    'current_page' => $page,
+                    'per_page' => $perPage,
+                    'last_page' => $lastPage
+                ]
+            ];
         } catch (\Exception $e) {
             Logger::error('Error retrieving all folders', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            return [];
+            return [
+                'folders' => [],
+                'pagination' => [
+                    'total' => 0,
+                    'current_page' => $page,
+                    'per_page' => $perPage,
+                    'last_page' => 1
+                ]
+            ];
         }
     }
 

@@ -35,21 +35,37 @@ class FolderController
     public function index(): void
     {
         try {
-            $currentUser = AuthMiddleware::getCurrentUser();
+            // Get query parameters
+            $page = (int) ($this->request->getQueryParameter('page', 1));
+            $perPage = (int) ($this->request->getQueryParameter('per_page', 20));
+            $search = $this->request->getQueryParameter('search');
+            $sortBy = $this->request->getQueryParameter('sort_by', 'id');
+            $sortOrder = $this->request->getQueryParameter('sort_order', 'DESC');
 
-            // Check authentication
-            if (!$currentUser) {
-                $this->response->error('Authentication required', 401);
+            // Validate parameters
+            $validation = Validator::make([
+                'page' => $page,
+                'per_page' => $perPage,
+                'search' => $search,
+                'sort_by' => $sortBy,
+                'sort_order' => $sortOrder
+            ], [
+                'page' => 'integer|min:1',
+                'per_page' => 'integer|between:1,100',
+                'search' => 'nullable|min:2|max:100',
+                'sort_by' => 'in:id,name,created_at',
+                'sort_order' => 'in:ASC,DESC'
+            ]);
+
+            if (!$validation->validate()) {
+                $this->response->validationError($validation->getErrors(), 'Invalid query parameters');
                 return;
             }
 
-            // Get all folders
-            $folders = Folder::getAllFolders();
+            // Get folders with pagination
+            $result = Folder::getAllFolders($page, $perPage, $search, $sortBy, $sortOrder);
 
-            $this->response->success([
-                'folders' => $folders,
-                'total' => count($folders)
-            ], 'Folders retrieved successfully');
+            $this->response->success($result, 'Folders retrieved successfully');
         } catch (\Exception $e) {
             Logger::error('Folder listing error', [
                 'error' => $e->getMessage(),

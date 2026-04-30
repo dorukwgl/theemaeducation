@@ -5,6 +5,7 @@ namespace EMA\Models;
 use EMA\Utils\Validator;
 use EMA\Utils\Logger;
 use EMA\Utils\Security;
+use EMA\Config\Constants;
 
 class QuizSet
 {
@@ -18,7 +19,7 @@ class QuizSet
         try {
             $query = "
                 SELECT qs.id, qs.folder_id, qs.name, qs.description, qs.icon_path,
-                       qs.access_type, qs.question_count, qs.total_questions,
+                       qs.access_type, qs.status, qs.question_count, qs.total_questions,
                        qs.duration_minutes, qs.passing_score, qs.is_published,
                        qs.created_by, qs.updated_at,
                        fl.name as folder_name, fl.icon_path as folder_icon_path
@@ -46,6 +47,7 @@ class QuizSet
                 'description' => $quizSet['description'],
                 'icon_path' => $quizSet['icon_path'],
                 'access_type' => $quizSet['access_type'],
+                'status' => $quizSet['status'],
                 'question_count' => (int) $quizSet['question_count'],
                 'total_questions' => (int) $quizSet['total_questions'],
                 'duration_minutes' => (int) $quizSet['duration_minutes'],
@@ -82,12 +84,14 @@ class QuizSet
 
             $folderId = (int) $data['folder_id'];
             $name = trim($data['name']);
-            $description = $data['description'] ?? null;
-            $iconPath = $data['icon_path'] ?? null;
-            $accessType = $data['access_type'] ?? 'logged_in';
+            $description = $data['description'] ?? '';
+            $iconPath = $data['icon_path'] ?? '';
+            $accessType = $data['access_type'] ?? Constants::ACCESS_LOGGED_IN;
+            $status = $data['status'] ?? Constants::STATUS_DRAFT;
+            $isPublished = isset($data['is_published']) ? (bool) $data['is_published'] : false;
             $durationMinutes = (int) ($data['duration_minutes'] ?? 0);
             $passingScore = (int) ($data['passing_score'] ?? 70);
-            $createdBy = $data['created_by'] ?? null;
+            $createdBy = $data['created_by'] ?? 1;
 
             // Validate folder exists
             $folder = Folder::findById($folderId);
@@ -96,33 +100,82 @@ class QuizSet
             }
 
             // Validate access_type
-            if (!in_array($accessType, ['all', 'logged_in'])) {
+            $validAccessTypes = [
+                Constants::ACCESS_ALL,
+                Constants::ACCESS_LOGGED_IN,
+                Constants::ACCESS_PRIVATE
+            ];
+            if (!in_array($accessType, $validAccessTypes)) {
+                return false;
+            }
+
+            // Validate status
+            $validStatuses = [
+                Constants::STATUS_PUBLISHED,
+                Constants::STATUS_DRAFT,
+                Constants::STATUS_ARCHIVED
+            ];
+            if (!in_array($status, $validStatuses)) {
                 return false;
             }
 
             // Insert quiz set
-            $query = "INSERT INTO quiz_sets (folder_id, name, description, icon_path, access_type, duration_minutes, passing_score, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+            $query = "INSERT INTO quiz_sets (folder_id, name, access_type, status, is_published, duration_minutes, passing_score, created_by";
+            $types = 'isssiiii';
+            $params = [$folderId, $name, $accessType, $status, $isPublished ? 1 : 0, $durationMinutes, $passingScore, $createdBy];
+
+            // Add description if provided
+            if ($description !== '') {
+                $query .= ", description";
+                $types .= 's';
+                $params[] = $description;
+            }
+
+            // Add icon_path if provided
+            if ($iconPath !== '') {
+                $query .= ", icon_path";
+                $types .= 's';
+                $params[] = $iconPath;
+            }
+
+            $query .= ") VALUES (";
+            $placeholders = array_fill(0, count($params), '?');
+            $query .= implode(', ', $placeholders);
+            $query .= ")";
+
             $stmt = \EMA\Config\Database::prepare($query);
-            
+
+            if (!$stmt) {
+                Logger::error('QuizSet::create - Prepare failed', [
+                    'error' => \EMA\Config\Database::getConnection()->error,
+                    'query' => $query
+                ]);
+                return false;
+            }
+
             // Debug logging
             Logger::log('QuizSet::create - Binding parameters', [
-                'folderId' => $folderId,
-                'name' => $name,
-                'description' => $description,
-                'iconPath' => $iconPath,
-                'accessType' => $accessType,
-                'accessType_length' => strlen($accessType),
-                'durationMinutes' => $durationMinutes,
-                'passingScore' => $passingScore,
-                'createdBy' => $createdBy
+                'query' => $query,
+                'types' => $types,
+                'params' => $params
             ]);
-            
-            $stmt->bind_param('isssisii', $folderId, $name, $description, $iconPath, $accessType, $durationMinutes, $passingScore, $createdBy);
+
+            $stmt->bind_param($types, ...$params);
+
+            Logger::log('QuizSet::create - Executing query');
 
             if ($stmt->execute()) {
                 $quizSetId = $stmt->insert_id;
                 $stmt->close();
+                Logger::log('QuizSet::create - Success', ['quiz_set_id' => $quizSetId]);
                 return $quizSetId;
+            } else {
+                Logger::error('QuizSet::create - Execute failed', [
+                    'error' => $stmt->error,
+                    'errno' => $stmt->errno
+                ]);
+                $stmt->close();
+                return false;
             }
 
             $stmt->close();
@@ -185,7 +238,12 @@ class QuizSet
             // Handle access_type update
             if (isset($data['access_type'])) {
                 $accessType = $data['access_type'];
-                if (!in_array($accessType, ['all', 'logged_in'])) {
+                $validAccessTypes = [
+                    Constants::ACCESS_ALL,
+                    Constants::ACCESS_LOGGED_IN,
+                    Constants::ACCESS_PRIVATE
+                ];
+                if (!in_array($accessType, $validAccessTypes)) {
                     return false;
                 }
 
@@ -213,6 +271,23 @@ class QuizSet
                 $updates[] = 'is_published = ?';
                 $types .= 'i';
                 $params[] = (bool) $data['is_published'] ? 1 : 0;
+            }
+
+            // Handle status update
+            if (isset($data['status'])) {
+                $status = $data['status'];
+                $validStatuses = [
+                    Constants::STATUS_PUBLISHED,
+                    Constants::STATUS_DRAFT,
+                    Constants::STATUS_ARCHIVED
+                ];
+                if (!in_array($status, $validStatuses)) {
+                    return false;
+                }
+
+                $updates[] = 'status = ?';
+                $types .= 's';
+                $params[] = $status;
             }
 
             if (empty($updates)) {
@@ -443,18 +518,28 @@ class QuizSet
                 return false;
             }
 
+            // Check quiz set status - only published quiz sets are accessible
+            if ($quizSet['status'] !== Constants::STATUS_PUBLISHED) {
+                return false;
+            }
+
             // Check quiz set access_type
             $accessType = $quizSet['access_type'];
 
             // Public access
-            if ($accessType === 'all') {
+            if ($accessType === Constants::ACCESS_ALL) {
                 return true;
             }
 
             // Logged-in access
-            if ($accessType === 'logged_in') {
+            if ($accessType === Constants::ACCESS_LOGGED_IN) {
                 // User must be authenticated (checked by caller)
                 return true;
+            }
+
+            // Private access - check individual permissions via Access model
+            if ($accessType === Constants::ACCESS_PRIVATE) {
+                return Access::checkAccess($userId, $quizSetId, 'quiz_set');
             }
 
             // Check individual permissions
@@ -479,6 +564,8 @@ class QuizSet
      * @param int|null $userId User ID for access filtering
      * @param bool $includeQuestionCount Include question counts
      * @param bool $publishedOnly Only published quiz sets
+     * @param bool $includeNonPublished Include non-published quiz sets (admin only)
+     * @param string|null $statusFilter Filter by status (published, draft, archived)
      * @return array Quiz sets
      */
     public static function getAllQuizSets(
@@ -487,7 +574,9 @@ class QuizSet
         ?int $folderId = null,
         ?int $userId = null,
         bool $includeQuestionCount = false,
-        bool $publishedOnly = true
+        bool $publishedOnly = true,
+        bool $includeNonPublished = false,
+        ?string $statusFilter = null
     ): array {
         try {
             $conditions = [];
@@ -502,15 +591,29 @@ class QuizSet
             }
 
             // Add published filter for non-admin users
-            if ($publishedOnly && $userId !== null) {
+            if ($publishedOnly && $userId !== null && !$includeNonPublished) {
                 $conditions[] = 'qs.is_published = 1';
+            }
+
+            // Add status filter
+            if ($statusFilter !== null) {
+                $validStatuses = [
+                    Constants::STATUS_PUBLISHED,
+                    Constants::STATUS_DRAFT,
+                    Constants::STATUS_ARCHIVED
+                ];
+                if (in_array($statusFilter, $validStatuses)) {
+                    $conditions[] = 'qs.status = ?';
+                    $params[] = $statusFilter;
+                    $types .= 's';
+                }
             }
 
             // Add access control filtering for non-admin users
             if ($userId !== null && !User::isAdminById($userId)) {
                 $conditions[] = "(
-                    qs.access_type = 'all'
-                    OR qs.access_type = 'logged_in'
+                    qs.access_type = ?
+                    OR qs.access_type = ?
                     OR qs.id IN (
                         SELECT ap.item_id
                         FROM access_permissions ap
@@ -520,8 +623,12 @@ class QuizSet
                         AND (ap.access_times = 0 OR ap.times_accessed < ap.access_times)
                     )
                 )";
+                $publicAccess = Constants::ACCESS_ALL;
+                $loggedInAccess = Constants::ACCESS_LOGGED_IN;
+                $params[] = $publicAccess;
+                $params[] = $loggedInAccess;
                 $params[] = $userId;
-                $types .= 'i';
+                $types .= 'sii';
             }
 
             // Build WHERE clause
@@ -530,7 +637,10 @@ class QuizSet
             // Get quiz sets with pagination
             $offset = ($page - 1) * $perPage;
             $query = "
-                SELECT qs.*,
+                SELECT qs.id, qs.folder_id, qs.name, qs.description, qs.icon_path,
+                       qs.access_type, qs.status, qs.question_count, qs.total_questions,
+                       qs.duration_minutes, qs.passing_score, qs.is_published,
+                       qs.created_by, qs.created_at, qs.updated_at,
                        fl.name as folder_name,
                        fl.icon_path as folder_icon_path";
 
@@ -564,6 +674,7 @@ class QuizSet
                     'description' => $row['description'],
                     'icon_path' => $row['icon_path'],
                     'access_type' => $row['access_type'],
+                    'status' => $row['status'],
                     'question_count' => $includeQuestionCount ? (int) $row['question_count'] : null,
                     'total_questions' => (int) $row['total_questions'],
                     'duration_minutes' => (int) $row['duration_minutes'],
@@ -645,7 +756,7 @@ class QuizSet
             $accessQuery = "
                 SELECT COUNT(DISTINCT identifier) as users_with_access,
                        SUM(CASE WHEN identifier LIKE 'user_%' THEN 1 ELSE 0 END) as individual_access_count,
-                       SUM(CASE WHEN access_type = 'all' THEN 1 ELSE 0 END) as public_access_count
+                       0 as public_access_count
                 FROM access_permissions
                 WHERE item_id = ? AND item_type = 'quiz_set'
             ";
@@ -668,9 +779,11 @@ class QuizSet
                     : 0,
                 'users_with_access' => (int) $accessStats['users_with_access'],
                 'individual_access_count' => (int) $accessStats['individual_access_count'],
-                'public_access_count' => (int) $accessStats['public_access_count'],
+                'public_access_count' => $quizSet['access_type'] === Constants::ACCESS_ALL ? 1 : 0,
                 'access_type' => $quizSet['access_type'],
-                'is_published' => $quizSet['is_published']
+                'status' => $quizSet['status'],
+                'is_published' => $quizSet['is_published'],
+                'is_active' => $quizSet['status'] === Constants::STATUS_PUBLISHED
             ];
 
             return $statistics;
@@ -680,6 +793,286 @@ class QuizSet
                 'error' => $e->getMessage()
             ]);
             return [];
+        }
+    }
+
+    /**
+     * Check if quiz set is published (active)
+     * @param int $quizSetId Quiz set ID
+     * @return bool true if published, false otherwise
+     */
+    public static function isQuizSetPublished(int $quizSetId): bool
+    {
+        try {
+            $quizSet = self::findById($quizSetId);
+            if (!$quizSet) {
+                return false;
+            }
+
+            return $quizSet['status'] === Constants::STATUS_PUBLISHED;
+        } catch (\Exception $e) {
+            Logger::error('Error checking quiz set published status', [
+                'quiz_set_id' => $quizSetId,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Check if quiz set is publicly accessible
+     * @param int $quizSetId Quiz set ID
+     * @return bool true if public and published, false otherwise
+     */
+    public static function isQuizSetPublic(int $quizSetId): bool
+    {
+        try {
+            $quizSet = self::findById($quizSetId);
+            if (!$quizSet) {
+                return false;
+            }
+
+            return $quizSet['access_type'] === Constants::ACCESS_ALL &&
+                   $quizSet['status'] === Constants::STATUS_PUBLISHED &&
+                   $quizSet['is_published'];
+        } catch (\Exception $e) {
+            Logger::error('Error checking quiz set public status', [
+                'quiz_set_id' => $quizSetId,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Update quiz set status
+     * @param int $quizSetId Quiz set ID
+     * @param string $status New status
+     * @return bool true if successful, false otherwise
+     */
+    public static function updateStatus(int $quizSetId, string $status): bool
+    {
+        try {
+            // Validate status
+            $validStatuses = [
+                Constants::STATUS_PUBLISHED,
+                Constants::STATUS_DRAFT,
+                Constants::STATUS_ARCHIVED
+            ];
+            if (!in_array($status, $validStatuses)) {
+                Logger::error('Invalid status for quiz set', [
+                    'quiz_set_id' => $quizSetId,
+                    'status' => $status
+                ]);
+                return false;
+            }
+
+            // Check if quiz set exists
+            $quizSet = self::findById($quizSetId);
+            if (!$quizSet) {
+                Logger::error('Quiz set not found for status update', [
+                    'quiz_set_id' => $quizSetId
+                ]);
+                return false;
+            }
+
+            // Update status
+            $query = "UPDATE quiz_sets SET status = ? WHERE id = ?";
+            $stmt = \EMA\Config\Database::prepare($query);
+
+            // Assign status to variable for bind_param
+            $statusVar = $status;
+            $stmt->bind_param('si', $statusVar, $quizSetId);
+
+            $result = $stmt->execute();
+            $stmt->close();
+
+            if ($result) {
+                Logger::log('Quiz set status updated', [
+                    'quiz_set_id' => $quizSetId,
+                    'old_status' => $quizSet['status'],
+                    'new_status' => $status
+                ]);
+                return true;
+            }
+
+            return false;
+        } catch (\Exception $e) {
+            Logger::error('Error updating quiz set status', [
+                'quiz_set_id' => $quizSetId,
+                'status' => $status,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Update quiz set access type
+     * @param int $quizSetId Quiz set ID
+     * @param string $accessType New access type
+     * @return bool true if successful, false otherwise
+     */
+    public static function updateAccessType(int $quizSetId, string $accessType): bool
+    {
+        try {
+            // Validate access type
+            $validAccessTypes = [
+                Constants::ACCESS_ALL,
+                Constants::ACCESS_LOGGED_IN,
+                Constants::ACCESS_PRIVATE
+            ];
+            if (!in_array($accessType, $validAccessTypes)) {
+                Logger::error('Invalid access type for quiz set', [
+                    'quiz_set_id' => $quizSetId,
+                    'access_type' => $accessType
+                ]);
+                return false;
+            }
+
+            // Check if quiz set exists
+            $quizSet = self::findById($quizSetId);
+            if (!$quizSet) {
+                Logger::error('Quiz set not found for access type update', [
+                    'quiz_set_id' => $quizSetId
+                ]);
+                return false;
+            }
+
+            // Update access type
+            $query = "UPDATE quiz_sets SET access_type = ? WHERE id = ?";
+            $stmt = \EMA\Config\Database::prepare($query);
+
+            // Assign accessType to variable for bind_param
+            $accessTypeVar = $accessType;
+            $stmt->bind_param('si', $accessTypeVar, $quizSetId);
+
+            $result = $stmt->execute();
+            $stmt->close();
+
+            if ($result) {
+                Logger::log('Quiz set access type updated', [
+                    'quiz_set_id' => $quizSetId,
+                    'old_access_type' => $quizSet['access_type'],
+                    'new_access_type' => $accessType
+                ]);
+                return true;
+            }
+
+            return false;
+        } catch (\Exception $e) {
+            Logger::error('Error updating quiz set access type', [
+                'quiz_set_id' => $quizSetId,
+                'access_type' => $accessType,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Get public quiz sets with pagination
+     * @param int $folderId Folder ID
+     * @param int $page Page number
+     * @param int $perPage Items per page
+     * @return array Public quiz sets with pagination metadata
+     */
+    public static function getPublicQuizSetsPaginated(int $folderId, int $page, int $perPage): array
+    {
+        try {
+            $offset = ($page - 1) * $perPage;
+
+            // Get public, published quiz sets
+            $query = "
+                SELECT qs.id, qs.folder_id, qs.name, qs.description, qs.icon_path,
+                       qs.access_type, qs.status, qs.question_count, qs.total_questions,
+                       qs.duration_minutes, qs.passing_score, qs.is_published,
+                       qs.created_by, qs.created_at, qs.updated_at,
+                       fl.name as folder_name,
+                       fl.icon_path as folder_icon_path
+                FROM quiz_sets qs
+                LEFT JOIN folders fl ON qs.folder_id = fl.id
+                WHERE qs.folder_id = ?
+                  AND qs.access_type = ?
+                  AND qs.status = ?
+                  AND qs.is_published = 1
+                ORDER BY qs.created_at DESC
+                LIMIT ? OFFSET ?
+            ";
+
+            $publicAccess = Constants::ACCESS_ALL;
+            $publishedStatus = Constants::STATUS_PUBLISHED;
+
+            $stmt = \EMA\Config\Database::prepare($query);
+            $stmt->bind_param('issii', $folderId, $publicAccess, $publishedStatus, $perPage, $offset);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            $quizSets = [];
+            while ($row = $result->fetch_assoc()) {
+                $quizSetData = [
+                    'id' => (int) $row['id'],
+                    'folder_id' => (int) $row['folder_id'],
+                    'name' => $row['name'],
+                    'description' => $row['description'],
+                    'icon_path' => $row['icon_path'],
+                    'access_type' => $row['access_type'],
+                    'status' => $row['status'],
+                    'question_count' => (int) $row['question_count'],
+                    'total_questions' => (int) $row['total_questions'],
+                    'duration_minutes' => (int) $row['duration_minutes'],
+                    'passing_score' => (int) $row['passing_score'],
+                    'is_published' => (bool) $row['is_published'],
+                    'created_by' => $row['created_by'],
+                    'created_at' => $row['created_at'],
+                    'updated_at' => $row['updated_at'],
+                    'folder_name' => $row['folder_name'],
+                    'folder_icon_path' => $row['folder_icon_path']
+                ];
+                $quizSets[] = $quizSetData;
+            }
+
+            $stmt->close();
+
+            // Get total count
+            $countQuery = "
+                SELECT COUNT(*) as total
+                FROM quiz_sets qs
+                WHERE qs.folder_id = ?
+                  AND qs.access_type = ?
+                  AND qs.status = ?
+                  AND qs.is_published = 1
+            ";
+
+            $countStmt = \EMA\Config\Database::prepare($countQuery);
+            $countStmt->bind_param('iss', $folderId, $publicAccess, $publishedStatus);
+            $countStmt->execute();
+            $total = $countStmt->get_result()->fetch_assoc()['total'];
+            $countStmt->close();
+
+            return [
+                'quiz_sets' => $quizSets,
+                'pagination' => [
+                    'page' => $page,
+                    'per_page' => $perPage,
+                    'total' => (int) $total,
+                    'total_pages' => (int) ceil($total / $perPage)
+                ]
+            ];
+        } catch (\Exception $e) {
+            Logger::error('Error getting public quiz sets', [
+                'folder_id' => $folderId,
+                'error' => $e->getMessage()
+            ]);
+            return [
+                'quiz_sets' => [],
+                'pagination' => [
+                    'page' => $page,
+                    'per_page' => $perPage,
+                    'total' => 0,
+                    'total_pages' => 0
+                ]
+            ];
         }
     }
 }
