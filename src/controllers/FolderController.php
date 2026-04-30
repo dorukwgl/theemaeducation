@@ -76,6 +76,7 @@ class FolderController
 
             $data = $this->request->allInput();
 
+
             // Validate input
             $validation = Validator::make($data, [
                 'name' => 'required|min:2|max:255'
@@ -89,6 +90,7 @@ class FolderController
             // Handle icon upload if present
             $iconData = null;
             if (isset($_FILES['icon']) && $_FILES['icon']['error'] === UPLOAD_ERR_OK) {
+                // Handle multipart file upload
                 $iconData = [
                     'tmp_name' => $_FILES['icon']['tmp_name'],
                     'name' => $_FILES['icon']['name'],
@@ -103,12 +105,77 @@ class FolderController
                 }
 
                 $data['icon_path'] = $iconData; // Pass icon data to model
+            } elseif (isset($data['icon']) && is_string($data['icon']) && !empty($data['icon'])) {
+                // Handle base64 encoded icon
+                $base64Icon = $data['icon'];
+
+                // Check if it's a valid base64 data URI
+                // Accept formats like: data:image/jpeg;base64,... or data:image/png;charset=utf-8;base64,...
+                if (preg_match('/^data:image\/([a-zA-Z0-9+]+);base64,/', $base64Icon, $matches)) {
+                    $mimeType = 'image/' . $matches[1];
+                    $extension = $matches[1];
+
+                    // Extract the base64 data
+                    $base64Data = substr($base64Icon, strpos($base64Icon, ',') + 1);
+                    $decodedImage = base64_decode($base64Data);
+
+                    if ($decodedImage === false) {
+                        $this->response->error('Invalid base64 image data', 400);
+                        return;
+                    }
+
+                    // Validate image type
+                    $allowedTypes = ['jpeg', 'png', 'gif', 'webp'];
+                    if (!in_array($extension, $allowedTypes)) {
+                        $this->response->error('Invalid image type. Only JPG, PNG, GIF, WebP allowed', 400);
+                        return;
+                    }
+
+                    // Validate image size (max 2MB)
+                    if (strlen($decodedImage) > 2097152) {
+                        $this->response->error('Icon file size exceeds maximum allowed size of 2MB', 400);
+                        return;
+                    }
+
+                    // Generate secure filename
+                    $iconFilename = 'folder_' . bin2hex(random_bytes(16)) . '.' . $extension;
+                    $iconPath = 'folders/' . $iconFilename; // Save without uploads/ prefix
+                    $fullPath = ROOT_PATH . '/uploads/' . $iconPath; // Add uploads/ for file system
+
+                    // Create directory if not exists
+                    if (!is_dir(dirname($fullPath))) {
+                        mkdir(dirname($fullPath), 0755, true);
+                    }
+
+                    // Save decoded image
+                    $bytesWritten = file_put_contents($fullPath, $decodedImage);
+                    if ($bytesWritten === false) {
+                        Logger::error('Failed to save icon file', ['path' => $fullPath]);
+                        $this->response->error('Failed to save icon', 500);
+                        return;
+                    }
+
+                    // Set file permissions
+                    chmod($fullPath, 0644);
+
+                    // Store as string path (not as array like multipart upload)
+                    $data['icon_path'] = $iconPath;
+
+                } else {
+                    Logger::error('Invalid icon format', [
+                        'icon_start' => substr($base64Icon, 0, 100),
+                        'contains_data' => strpos($base64Icon, 'data:image') !== false
+                    ]);
+                    $this->response->error('Invalid icon format. Expected base64 data URI format: data:image/type;base64,data', 400);
+                    return;
+                }
             }
 
             // Create folder
             $folderId = Folder::create($data);
 
-            if ($folderId) {
+            // Check if folder creation was successful and returned a valid ID
+            if ($folderId !== false && is_numeric($folderId) && $folderId > 0) {
                 $folder = Folder::findById($folderId);
 
                 $this->response->success([
@@ -116,7 +183,7 @@ class FolderController
                     'id' => $folderId
                 ],'Folder created successfully');
             } else {
-                $this->response->error('Failed to create folder', 500);
+                $this->response->error('Failed to create folder. Error Occurred: ' . $folderId, 500);
             }
         } catch (\Exception $e) {
             Logger::error('Folder creation error', [
@@ -233,8 +300,9 @@ class FolderController
                 return;
             }
 
-            // Handle icon upload if present
+            // Handle icon upload if present (both multipart and base64)
             if (isset($_FILES['icon']) && $_FILES['icon']['error'] === UPLOAD_ERR_OK) {
+                // Handle multipart file upload
                 $iconData = [
                     'tmp_name' => $_FILES['icon']['tmp_name'],
                     'name' => $_FILES['icon']['name'],
@@ -249,6 +317,69 @@ class FolderController
                 }
 
                 $data['icon_path'] = $iconData;
+            } elseif (isset($data['icon']) && is_string($data['icon']) && !empty($data['icon'])) {
+                // Handle base64 encoded icon
+                $base64Icon = $data['icon'];
+
+                // Check if it's a valid base64 data URI
+                // Accept formats like: data:image/jpeg;base64,... or data:image/png;charset=utf-8;base64,...
+                if (preg_match('/^data:image\/([a-zA-Z0-9+]+);base64,/', $base64Icon, $matches)) {
+                    $mimeType = 'image/' . $matches[1];
+                    $extension = $matches[1];
+
+                    // Extract the base64 data
+                    $base64Data = substr($base64Icon, strpos($base64Icon, ',') + 1);
+                    $decodedImage = base64_decode($base64Data);
+
+                    if ($decodedImage === false) {
+                        Logger::error('Failed to decode base64 image for update');
+                        $this->response->error('Invalid base64 image data', 400);
+                        return;
+                    }
+
+                    // Validate image type
+                    $allowedTypes = ['jpeg', 'png', 'gif', 'webp'];
+                    if (!in_array($extension, $allowedTypes)) {
+                        $this->response->error('Invalid image type. Only JPG, PNG, GIF, WebP allowed', 400);
+                        return;
+                    }
+
+                    // Validate image size (max 2MB)
+                    if (strlen($decodedImage) > 2097152) {
+                        $this->response->error('Icon file size exceeds maximum allowed size of 2MB', 400);
+                        return;
+                    }
+
+                    // Generate secure filename
+                    $iconFilename = 'folder_' . bin2hex(random_bytes(16)) . '.' . $extension;
+                    $iconPath = 'folders/' . $iconFilename; // Save without uploads/ prefix
+                    $fullPath = ROOT_PATH . '/uploads/' . $iconPath; // Add uploads/ for file system
+
+                    // Create directory if not exists
+                    if (!is_dir(dirname($fullPath))) {
+                        mkdir(dirname($fullPath), 0755, true);
+                    }
+
+                    // Save decoded image
+                    if (file_put_contents($fullPath, $decodedImage) === false) {
+                        $this->response->error('Failed to save icon', 500);
+                        return;
+                    }
+
+                    // Set file permissions
+                    chmod($fullPath, 0644);
+
+                    // Store as string path (not as array like multipart upload)
+                    $data['icon_path'] = $iconPath;
+
+                } else {
+                    Logger::error('Invalid icon format', [
+                        'icon_start' => substr($base64Icon, 0, 100),
+                        'contains_data' => strpos($base64Icon, 'data:image') !== false
+                    ]);
+                    $this->response->error('Invalid icon format. Expected base64 data URI format: data:image/type;base64,data', 400);
+                    return;
+                }
             }
 
             // Update folder

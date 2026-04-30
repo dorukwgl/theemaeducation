@@ -178,25 +178,34 @@ class FileController
 
     /**
      * Serve file by path
-     * GET /api/files/{path}
+     * GET /api/res/{path}
+     * Supports both legacy format (uploads/category/filename.ext) and new format (category/filename.ext)
+     * treats uploads/ as root directory (not exposed in URL)
      */
     public function serveByPath(string $path): void
     {
         try {
             // URL-decode the path to handle special characters
             $path = urldecode($path);
-            // Prepend uploads/ to path since /api/res/ maps to uploads/ directory
+
+            // Detect and transform path format
+            // Legacy format: uploads/category/filename.ext
+            // New format: category/filename.ext
+
+            // Build full path (uploads/ is the root directory for user-generated resources)
             $fullPath = 'uploads/' . $path;
             $fullFilePath = ROOT_PATH . '/' . $fullPath;
             $realPath = realpath($fullFilePath);
-            
+
             // Define allowed storage directories (uploads is root for all user-generated resources)
             $allowedPaths = [
                 realpath(ROOT_PATH . '/uploads/files/'),
                 realpath(ROOT_PATH . '/uploads/icons/'),
+                realpath(ROOT_PATH . '/uploads/folders/'),
                 realpath(ROOT_PATH . '/uploads/notices/'),
                 realpath(ROOT_PATH . '/uploads/profile_images/'),
                 realpath(ROOT_PATH . '/uploads/questions/'),
+                realpath(ROOT_PATH . '/uploads/choices/'),
             ];
 
             // Ensure path is within one of the allowed directories

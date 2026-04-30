@@ -100,7 +100,7 @@ class Folder
      */
     public static function create(array $data): int|false
     {
-        try {
+        try {            
             // Validate required fields
             if (!isset($data['name']) || empty(trim($data['name']))) {
                 return false;
@@ -108,17 +108,22 @@ class Folder
 
             $name = trim($data['name']);
             $iconPath = $data['icon_path'] ?? null;
-
+            
             // Check if folder name already exists
             if (self::nameExists($name)) {
                 return false;
             }
 
-            // Handle icon upload if provided
+            // Handle icon if provided
             if ($iconPath) {
-                $iconPath = self::handleIconUpload($iconPath);
-                if (!$iconPath) {
-                    return false;
+                // If iconPath is already a processed path (starts with folders/), use it directly
+                if (is_string($iconPath) && strpos($iconPath, 'folders/') === 0) {
+                } else {
+                    // Otherwise, treat as new upload
+                    $iconPath = self::handleIconUpload($iconPath);
+                    if (!$iconPath) {
+                        return false;
+                    }
                 }
             }
 
@@ -414,8 +419,11 @@ class Folder
     private static function handleIconUpload($iconData): string|false
     {
         try {
+            Logger::log('handleIconUpload - Starting', ['iconData' => $iconData]);
+            
             // If iconData is already a path (already uploaded)
             if (is_string($iconData) && file_exists(ROOT_PATH . '/' . $iconData)) {
+                Logger::log('handleIconUpload - Already uploaded file', ['iconData' => $iconData]);
                 return $iconData;
             }
 
@@ -425,18 +433,31 @@ class Folder
                 $originalName = $iconData['name'] ?? 'icon.jpg';
                 $extension = pathinfo($originalName, PATHINFO_EXTENSION);
 
+                Logger::log('handleIconUpload - Processing file', [
+                    'tmpName' => $tmpName,
+                    'originalName' => $originalName,
+                    'extension' => $extension
+                ]);
+
                 // Validate icon file
                 if (!in_array(strtolower($extension), ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
+                    Logger::log('handleIconUpload - Failed: Invalid extension', ['extension' => $extension]);
                     return false;
                 }
 
                 // Generate secure filename
-                $iconPath = 'uploads/icons/folder_' . time() . '_' . bin2hex(random_bytes(8)) . '.' . $extension;
-                $fullPath = ROOT_PATH . '/' . $iconPath;
+                $iconPath = 'folders/folder_' . time() . '_' . bin2hex(random_bytes(8)) . '.' . $extension;
+                $fullPath = ROOT_PATH . '/uploads/' . $iconPath;
+
+                Logger::log('handleIconUpload - Generated paths', [
+                    'iconPath' => $iconPath,
+                    'fullPath' => $fullPath
+                ]);
 
                 // Create directory if not exists
                 $dir = dirname($fullPath);
                 if (!is_dir($dir)) {
+                    Logger::log('handleIconUpload - Creating directory', ['dir' => $dir]);
                     mkdir($dir, 0755, true);
                 }
 
@@ -452,9 +473,11 @@ class Folder
                 // Set file permissions
                 chmod($fullPath, 0644);
 
+                Logger::log('handleIconUpload - Success', ['iconPath' => $iconPath]);
                 return $iconPath;
             }
 
+            Logger::log('handleIconUpload - Failed: Invalid icon data format');
             return false;
         } catch (\Exception $e) {
             Logger::error('Error handling icon upload', [
