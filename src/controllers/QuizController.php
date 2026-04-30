@@ -36,23 +36,43 @@ class QuizController
     public function index(): void
     {
         try {
+            $currentUser = \EMA\Middleware\AuthMiddleware::getCurrentUser();
+            $userId = $currentUser['id'];
+
             $page = (int) ($this->request->getInput('page', 1));
             $perPage = (int) ($this->request->getInput('per_page', 20));
             $folderId = $this->request->getInput('folder_id') ? (int) $this->request->getInput('folder_id') : null;
             $includeQuestionCount = $this->request->getInput('include_question_count') === 'true';
-            $publishedOnly = $this->request->getInput('published_only') !== 'false';
+            $accessType = $this->request->getInput('access_type');
+            $status = $this->request->getInput('status');
 
             // Validate pagination parameters
             if ($page < 1) $page = 1;
             if ($perPage < 1 || $perPage > 100) $perPage = 20;
 
-            $userId = \EMA\Middleware\AuthMiddleware::getCurrentUserId();
-            $quizSets = QuizSet::getAllQuizSets($page, $perPage, $folderId, $userId, $includeQuestionCount, $publishedOnly);
+            // Validate access_type parameter
+            if ($accessType && !in_array($accessType, ['all', 'logged_in', 'private'])) {
+                $this->response->badRequest('Invalid access_type parameter. Must be "all", "logged_in", or "private"');
+                return;
+            }
+
+            // Validate status parameter
+            if ($status && !in_array($status, ['published', 'draft', 'archived'])) {
+                $this->response->badRequest('Invalid status parameter. Must be "published", "draft", or "archived"');
+                return;
+            }
+
+            // For admin users, get all quiz sets. For non-admin, get accessible quiz sets
+            if ($currentUser['role'] === 'admin') {
+                $quizSets = QuizSet::getAllQuizSetsPaginated($page, $perPage, $folderId, $accessType, $status, $includeQuestionCount);
+            } else {
+                $quizSets = QuizSet::getLoggedInQuizSetsPaginated($userId, $page, $perPage, $folderId, $accessType, $status, $includeQuestionCount);
+            }
 
             $this->response->success([
-                'quiz_sets' => $quizSets,
-                'page' => $page,
-                'per_page' => $perPage
+                'quiz_sets' => $quizSets['quiz_sets'],
+                'pagination' => $quizSets['pagination'],
+                'total' => $quizSets['total']
             ], 'Quiz sets retrieved successfully');
 
         } catch (\Exception $e) {
@@ -73,7 +93,8 @@ class QuizController
     public function show(int $id): void
     {
         try {
-            $userId = \EMA\Middleware\AuthMiddleware::getCurrentUserId();
+            $currentUser = \EMA\Middleware\AuthMiddleware::getCurrentUser();
+            $userId = $currentUser['id'];
             $includeQuestions = $this->request->getInput('include_questions') === 'true';
             $includeStats = $this->request->getInput('include_stats') === 'true';
 
@@ -85,7 +106,7 @@ class QuizController
                 return;
             }
 
-            // Check access
+            // Check access using enhanced QuizSet model access control
             if (!QuizSet::checkQuizSetAccess($userId, $id)) {
                 $this->response->forbidden('Access denied to quiz set');
                 return;
@@ -96,7 +117,8 @@ class QuizController
                 'quiz_set' => $quizSet,
                 'access_info' => [
                     'has_access' => true,
-                    'access_type' => $quizSet['access_type']
+                    'access_type' => $quizSet['access_type'],
+                    'status' => $quizSet['status']
                 ]
             ];
 
@@ -104,8 +126,8 @@ class QuizController
             if ($includeQuestions) {
                 $questions = Question::findByQuizSetId($id);
 
-                // For non-admin users, only include published questions if quiz is not published
-                if (!$quizSet['is_published'] && !\EMA\Middleware\AuthMiddleware::isAdmin()) {
+                // For non-admin users, only include questions if quiz is published
+                if ($quizSet['status'] !== 'published' && $currentUser['role'] !== 'admin') {
                     $responseData['message'] = 'Quiz set is not published yet';
                 }
 
@@ -113,7 +135,7 @@ class QuizController
             }
 
             // Include statistics if requested and user has permission
-            if ($includeStats && (\EMA\Middleware\AuthMiddleware::isAdmin() || $quizSet['created_by'] == $userId)) {
+            if ($includeStats && ($currentUser['role'] === 'admin' || $quizSet['created_by'] == $userId)) {
                 $stats = QuizSet::getQuizSetStats($id);
                 $responseData['stats'] = $stats;
             }
@@ -294,8 +316,9 @@ class QuizController
     public function questions(int $id): void
     {
         try {
-            $userId = \EMA\Middleware\AuthMiddleware::getCurrentUserId();
-                        $page = (int) ($this->request->getInput('page', 1));
+            $currentUser = \EMA\Middleware\AuthMiddleware::getCurrentUser();
+            $userId = $currentUser['id'];
+            $page = (int) ($this->request->getInput('page', 1));
             $perPage = (int) ($this->request->getInput('per_page', 20));
             $includeFiles = $this->request->getInput('include_files') === 'true';
 
@@ -561,8 +584,8 @@ class QuizController
                 return;
             }
 
-            // Check if quiz is published
-            if (!$quizSet['is_published'] && !\EMA\Middleware\AuthMiddleware::isAdmin()) {
+            // Check if quiz is published (using new status field)
+            if ($quizSet['status'] !== 'published' && !\EMA\Middleware\AuthMiddleware::isAdmin()) {
                 $this->response->forbidden('Quiz set is not published yet');
                 return;
             }
@@ -851,6 +874,347 @@ class QuizController
                 'quiz_set_id' => $quizSetId,
                 'error' => $e->getMessage()
             ]);
+        }
+    }
+
+    /**
+     * Public index - Get all public published quiz sets
+     * GET /api/public/quiz-sets
+     * No authentication required
+     */
+    public function publicIndex(): void
+    {
+        try {
+            $page = (int) ($this->request->getInput('page', 1));
+            $perPage = (int) ($this->request->getInput('per_page', 20));
+            $folderId = $this->request->getInput('folder_id') ? (int) $this->request->getInput('folder_id') : null;
+            $search = $this->request->getInput('search');
+            $includeQuestionCount = $this->request->getInput('include_question_count') === 'true';
+
+            // Validate pagination parameters
+            if ($page < 1) $page = 1;
+            if ($perPage < 1 || $perPage > 100) $perPage = 20;
+
+            // Get public published quiz sets
+            $quizSets = QuizSet::getPublicQuizSetsPaginated($page, $perPage, $search, $folderId, $includeQuestionCount);
+
+            $this->response->success($quizSets, 'Public quiz sets retrieved successfully');
+        } catch (\Exception $e) {
+            Logger::error('Error getting public quiz sets', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            $this->response->error('Failed to retrieve public quiz sets', 500, ['Internal server error']);
+        }
+    }
+
+    /**
+     * Public show - Display a public published quiz set
+     * GET /api/public/quiz-sets/{id}
+     * No authentication required
+     */
+    public function publicShow(int $id): void
+    {
+        try {
+            $includeQuestions = $this->request->getInput('include_questions') === 'true';
+
+            // Get quiz set details
+            $quizSet = QuizSet::findById($id);
+
+            if (!$quizSet) {
+                $this->response->notFound('Quiz set not found');
+                return;
+            }
+
+            // Check if quiz set is public and published
+            if (!QuizSet::isQuizSetPublic($id) || !QuizSet::isQuizSetPublished($id)) {
+                $this->response->forbidden('Quiz set is not publicly available');
+                return;
+            }
+
+            // Prepare response data
+            $responseData = [
+                'quiz_set' => $quizSet,
+                'access_info' => [
+                    'is_public' => true,
+                    'is_published' => true,
+                    'access_type' => $quizSet['access_type'],
+                    'status' => $quizSet['status']
+                ]
+            ];
+
+            // Include questions if requested
+            if ($includeQuestions) {
+                $questions = Question::findByQuizSetId($id);
+                $responseData['questions'] = $questions;
+            }
+
+            $this->response->success($responseData, 'Quiz set retrieved successfully');
+        } catch (\Exception $e) {
+            Logger::error('Error getting public quiz set', [
+                'quiz_set_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            $this->response->error('Failed to retrieve quiz set', 500, ['Internal server error']);
+        }
+    }
+
+    /**
+     * Public questions - Get questions from a public published quiz set
+     * GET /api/public/quiz-sets/{id}/questions
+     * No authentication required
+     */
+    public function publicQuestions(int $id): void
+    {
+        try {
+            $page = (int) ($this->request->getInput('page', 1));
+            $perPage = (int) ($this->request->getInput('per_page', 20));
+            $includeFiles = $this->request->getInput('include_files') === 'true';
+
+            // Validate pagination parameters
+            if ($page < 1) $page = 1;
+            if ($perPage < 1 || $perPage > 100) $perPage = 20;
+
+            // Check if quiz set exists and is public
+            $quizSet = QuizSet::findById($id);
+            if (!$quizSet) {
+                $this->response->notFound('Quiz set not found');
+                return;
+            }
+
+            if (!QuizSet::isQuizSetPublic($id) || !QuizSet::isQuizSetPublished($id)) {
+                $this->response->forbidden('Quiz set is not publicly available');
+                return;
+            }
+
+            // Get questions
+            $questions = Question::findByQuizSetId($id);
+            $totalQuestions = count($questions);
+
+            // Apply pagination
+            $offset = ($page - 1) * $perPage;
+            $questions = array_slice($questions, $offset, $perPage);
+
+            // Filter file URLs based on parameter
+            if (!$includeFiles) {
+                foreach ($questions as &$question) {
+                    foreach (['question_file', 'choice_A_file', 'choice_B_file', 'choice_C_file', 'choice_D_file'] as $field) {
+                        if (isset($question[$field])) {
+                            $question[$field] = null;
+                        }
+                    }
+                    foreach (['A', 'B', 'C', 'D'] as $choice) {
+                        if (isset($question['choice_' . $choice]['file'])) {
+                            $question['choice_' . $choice]['file'] = null;
+                        }
+                    }
+                }
+                unset($question);
+            }
+
+            $this->response->success([
+                'questions' => $questions,
+                'total' => $totalQuestions,
+                'page' => $page,
+                'per_page' => $perPage,
+                'quiz_set_id' => $id
+            ], 'Questions retrieved successfully');
+        } catch (\Exception $e) {
+            Logger::error('Error getting public quiz set questions', [
+                'quiz_set_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            $this->response->error('Failed to retrieve questions', 500, ['Internal server error']);
+        }
+    }
+
+    /**
+     * Authenticated index - Get quiz sets accessible to logged-in users
+     * GET /api/quiz-sets
+     * Requires authentication
+     */
+    public function authenticatedIndex(): void
+    {
+        try {
+            $currentUser = \EMA\Middleware\AuthMiddleware::getCurrentUser();
+            $userId = $currentUser['id'];
+
+            $page = (int) ($this->request->getInput('page', 1));
+            $perPage = (int) ($this->request->getInput('per_page', 20));
+            $folderId = $this->request->getInput('folder_id') ? (int) $this->request->getInput('folder_id') : null;
+            $includeQuestionCount = $this->request->getInput('include_question_count') === 'true';
+            $accessType = $this->request->getInput('access_type');
+            $status = $this->request->getInput('status');
+
+            // Validate pagination parameters
+            if ($page < 1) $page = 1;
+            if ($perPage < 1 || $perPage > 100) $perPage = 20;
+
+            // Validate access_type parameter
+            if ($accessType && !in_array($accessType, ['all', 'logged_in', 'private'])) {
+                $this->response->badRequest('Invalid access_type parameter. Must be "all", "logged_in", or "private"');
+                return;
+            }
+
+            // Validate status parameter
+            if ($status && !in_array($status, ['published', 'draft', 'archived'])) {
+                $this->response->badRequest('Invalid status parameter. Must be "published", "draft", or "archived"');
+                return;
+            }
+
+            // For admin users, get all quiz sets. For non-admin, get accessible quiz sets
+            if ($currentUser['role'] === 'admin') {
+                $quizSets = QuizSet::getAllQuizSetsPaginated($page, $perPage, $folderId, $accessType, $status, $includeQuestionCount);
+            } else {
+                $quizSets = QuizSet::getLoggedInQuizSetsPaginated($userId, $page, $perPage, $folderId, $accessType, $status, $includeQuestionCount);
+            }
+
+            $this->response->success([
+                'quiz_sets' => $quizSets['quiz_sets'],
+                'pagination' => $quizSets['pagination'],
+                'total' => $quizSets['total']
+            ], 'Quiz sets retrieved successfully');
+        } catch (\Exception $e) {
+            Logger::error('Error getting authenticated quiz sets', [
+                'user_id' => $currentUser['id'] ?? 'unknown',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            $this->response->error('Failed to retrieve quiz sets', 500, ['Internal server error']);
+        }
+    }
+
+    /**
+     * Update quiz set status (Admin only)
+     * PUT /api/admin/quiz-sets/{id}/status
+     */
+    public function updateStatus(int $id): void
+    {
+        try {
+            // Require admin role
+            if (!\EMA\Middleware\AuthMiddleware::isAdmin()) {
+                $this->response->forbidden('Admin access required');
+                return;
+            }
+
+            // Get current user
+            $currentUser = \EMA\Middleware\AuthMiddleware::getCurrentUser();
+
+            // Get quiz set details
+            $quizSet = QuizSet::findById($id);
+            if (!$quizSet) {
+                $this->response->notFound('Quiz set not found');
+                return;
+            }
+
+            // Get new status from request
+            $data = $this->request->allInput();
+            $newStatus = $data['status'] ?? null;
+
+            if (!$newStatus) {
+                $this->response->badRequest('Status is required');
+                return;
+            }
+
+            // Validate status
+            if (!in_array($newStatus, ['published', 'draft', 'archived'])) {
+                $this->response->badRequest('Invalid status. Must be "published", "draft", or "archived"');
+                return;
+            }
+
+            // Update status
+            $result = QuizSet::updateStatus($id, $newStatus);
+
+            if ($result) {
+                $updatedQuizSet = QuizSet::findById($id);
+                Logger::log('Quiz set status updated', [
+                    'quiz_set_id' => $id,
+                    'old_status' => $quizSet['status'],
+                    'new_status' => $newStatus,
+                    'updated_by' => $currentUser['id']
+                ]);
+                $this->response->success($updatedQuizSet, 'Quiz set status updated successfully');
+            } else {
+                $this->response->error('Failed to update quiz set status', 500);
+            }
+        } catch (\Exception $e) {
+            Logger::error('Error updating quiz set status', [
+                'quiz_set_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            $this->response->error('Failed to update quiz set status', 500, ['Internal server error']);
+        }
+    }
+
+    /**
+     * Update quiz set access type (Admin only)
+     * PUT /api/admin/quiz-sets/{id}/access-type
+     */
+    public function updateAccessType(int $id): void
+    {
+        try {
+            // Require admin role
+            if (!\EMA\Middleware\AuthMiddleware::isAdmin()) {
+                $this->response->forbidden('Admin access required');
+                return;
+            }
+
+            // Get current user
+            $currentUser = \EMA\Middleware\AuthMiddleware::getCurrentUser();
+
+            // Get quiz set details
+            $quizSet = QuizSet::findById($id);
+            if (!$quizSet) {
+                $this->response->notFound('Quiz set not found');
+                return;
+            }
+
+            // Get new access type from request
+            $data = $this->request->allInput();
+            $newAccessType = $data['access_type'] ?? null;
+
+            if (!$newAccessType) {
+                $this->response->badRequest('Access type is required');
+                return;
+            }
+
+            // Validate access type
+            if (!in_array($newAccessType, ['all', 'logged_in', 'private'])) {
+                $this->response->badRequest('Invalid access type. Must be "all", "logged_in", or "private"');
+                return;
+            }
+
+            // Update access type
+            $result = QuizSet::updateAccessType($id, $newAccessType);
+
+            if ($result) {
+                $updatedQuizSet = QuizSet::findById($id);
+                Logger::log('Quiz set access type updated', [
+                    'quiz_set_id' => $id,
+                    'old_access_type' => $quizSet['access_type'],
+                    'new_access_type' => $newAccessType,
+                    'updated_by' => $currentUser['id']
+                ]);
+                $this->response->success($updatedQuizSet, 'Quiz set access type updated successfully');
+            } else {
+                $this->response->error('Failed to update quiz set access type', 500);
+            }
+        } catch (\Exception $e) {
+            Logger::error('Error updating quiz set access type', [
+                'quiz_set_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            $this->response->error('Failed to update quiz set access type', 500, ['Internal server error']);
         }
     }
 }

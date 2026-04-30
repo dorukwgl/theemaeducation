@@ -977,12 +977,19 @@ class QuizSet
      * @param int $perPage Items per page
      * @return array Public quiz sets with pagination metadata
      */
-    public static function getPublicQuizSetsPaginated(int $folderId, int $page, int $perPage): array
+    public static function getPublicQuizSetsPaginated(int $page, int $perPage, ?string $search = null, ?int $folderId = null, bool $includeQuestionCount = false): array
     {
         try {
-            $offset = ($page - 1) * $perPage;
+            // Validate folder if provided
+            if ($folderId !== null && !\EMA\Models\Folder::findById($folderId)) {
+                return [
+                    'quiz_sets' => [],
+                    'pagination' => \EMA\Utils\Pagination::getMetadata($page, $perPage, 0),
+                    'total' => 0
+                ];
+            }
 
-            // Get public, published quiz sets
+            // Build base query
             $query = "
                 SELECT qs.id, qs.folder_id, qs.name, qs.description, qs.icon_path,
                        qs.access_type, qs.status, qs.question_count, qs.total_questions,
@@ -992,19 +999,52 @@ class QuizSet
                        fl.icon_path as folder_icon_path
                 FROM quiz_sets qs
                 LEFT JOIN folders fl ON qs.folder_id = fl.id
-                WHERE qs.folder_id = ?
-                  AND qs.access_type = ?
+                WHERE qs.access_type = ?
                   AND qs.status = ?
                   AND qs.is_published = 1
-                ORDER BY qs.created_at DESC
-                LIMIT ? OFFSET ?
             ";
 
-            $publicAccess = Constants::ACCESS_ALL;
-            $publishedStatus = Constants::STATUS_PUBLISHED;
+            // Build count query
+            $countQuery = "
+                SELECT COUNT(*) as total
+                FROM quiz_sets qs
+                WHERE qs.access_type = ?
+                  AND qs.status = ?
+                  AND qs.is_published = 1
+            ";
 
+            // Build parameters arrays
+            $params = [Constants::ACCESS_ALL, Constants::STATUS_PUBLISHED];
+            $types = 'ss';
+
+            // Add folder filter if provided
+            if ($folderId !== null) {
+                $query .= " AND qs.folder_id = ?";
+                $countQuery .= " AND qs.folder_id = ?";
+                $params[] = $folderId;
+                $types .= 'i';
+            }
+
+            // Add search filter if provided
+            if ($search !== null) {
+                $query .= " AND (qs.name LIKE ? OR qs.id LIKE ?)";
+                $countQuery .= " AND (qs.name LIKE ? OR qs.id LIKE ?)";
+                $searchParam = "%{$search}%";
+                $params[] = $searchParam;
+                $params[] = $searchParam;
+                $types .= 'ss';
+            }
+
+            $query .= " ORDER BY qs.created_at DESC LIMIT ? OFFSET ?";
+
+            $offset = \EMA\Utils\Pagination::getOffset($page, $perPage);
+            $params[] = $perPage;
+            $params[] = $offset;
+            $types .= 'ii';
+
+            // Execute main query
             $stmt = \EMA\Config\Database::prepare($query);
-            $stmt->bind_param('issii', $folderId, $publicAccess, $publishedStatus, $perPage, $offset);
+            $stmt->bind_param($types, ...$params);
             $stmt->execute();
             $result = $stmt->get_result();
 
@@ -1034,44 +1074,342 @@ class QuizSet
 
             $stmt->close();
 
-            // Get total count
-            $countQuery = "
-                SELECT COUNT(*) as total
-                FROM quiz_sets qs
-                WHERE qs.folder_id = ?
-                  AND qs.access_type = ?
-                  AND qs.status = ?
-                  AND qs.is_published = 1
-            ";
+            // Execute count query (reuse params except limit/offset)
+            $countParams = array_slice($params, 0, -2);
+            $countTypes = substr($types, 0, -2);
 
             $countStmt = \EMA\Config\Database::prepare($countQuery);
-            $countStmt->bind_param('iss', $folderId, $publicAccess, $publishedStatus);
+
+            // Only bind parameters if we have them
+            if (!empty($countParams) && !empty($countTypes)) {
+                $countStmt->bind_param($countTypes, ...$countParams);
+            }
+
             $countStmt->execute();
             $total = $countStmt->get_result()->fetch_assoc()['total'];
             $countStmt->close();
 
+            $pagination = \EMA\Utils\Pagination::getMetadata($page, $perPage, $total);
+
             return [
                 'quiz_sets' => $quizSets,
-                'pagination' => [
-                    'page' => $page,
-                    'per_page' => $perPage,
-                    'total' => (int) $total,
-                    'total_pages' => (int) ceil($total / $perPage)
-                ]
+                'pagination' => $pagination,
+                'total' => $total
             ];
         } catch (\Exception $e) {
-            Logger::error('Error getting public quiz sets', [
+            Logger::error('Error getting public quiz sets paginated', [
+                'page' => $page,
+                'per_page' => $perPage,
+                'search' => $search,
                 'folder_id' => $folderId,
                 'error' => $e->getMessage()
             ]);
             return [
                 'quiz_sets' => [],
-                'pagination' => [
-                    'page' => $page,
-                    'per_page' => $perPage,
-                    'total' => 0,
-                    'total_pages' => 0
-                ]
+                'pagination' => \EMA\Utils\Pagination::getMetadata($page, $perPage, 0),
+                'total' => 0
+            ];
+        }
+    }
+
+    /**
+     * Get all quiz sets with pagination (admin use)
+     * @param int $page Page number
+     * @param int $perPage Items per page
+     * @param int|null $folderId Optional folder filter
+     * @param string|null $accessType Optional access type filter
+     * @param string|null $status Optional status filter
+     * @param bool $includeQuestionCount Include question count in results
+     * @return array Paginated quiz sets with metadata
+     */
+    public static function getAllQuizSetsPaginated(int $page, int $perPage, ?int $folderId = null, ?string $accessType = null, ?string $status = null, bool $includeQuestionCount = false): array
+    {
+        try {
+            // Build base query
+            $query = "
+                SELECT qs.id, qs.folder_id, qs.name, qs.description, qs.icon_path,
+                       qs.access_type, qs.status, qs.question_count, qs.total_questions,
+                       qs.duration_minutes, qs.passing_score, qs.is_published,
+                       qs.created_by, qs.created_at, qs.updated_at,
+                       fl.name as folder_name,
+                       fl.icon_path as folder_icon_path
+                FROM quiz_sets qs
+                LEFT JOIN folders fl ON qs.folder_id = fl.id
+                WHERE 1=1
+            ";
+
+            // Build count query
+            $countQuery = "SELECT COUNT(*) as total FROM quiz_sets qs WHERE 1=1";
+
+            // Build parameters arrays
+            $params = [];
+            $types = '';
+
+            // Add folder filter if provided
+            if ($folderId !== null) {
+                $query .= " AND qs.folder_id = ?";
+                $countQuery .= " AND qs.folder_id = ?";
+                $params[] = $folderId;
+                $types .= 'i';
+            }
+
+            // Add access type filter if provided
+            if ($accessType !== null) {
+                $query .= " AND qs.access_type = ?";
+                $countQuery .= " AND qs.access_type = ?";
+                $params[] = $accessType;
+                $types .= 's';
+            }
+
+            // Add status filter if provided
+            if ($status !== null) {
+                $query .= " AND qs.status = ?";
+                $countQuery .= " AND qs.status = ?";
+                $params[] = $status;
+                $types .= 's';
+            }
+
+            $query .= " ORDER BY qs.created_at DESC LIMIT ? OFFSET ?";
+
+            $offset = \EMA\Utils\Pagination::getOffset($page, $perPage);
+            $params[] = $perPage;
+            $params[] = $offset;
+            $types .= 'ii';
+
+            // Execute main query
+            $stmt = \EMA\Config\Database::prepare($query);
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            $quizSets = [];
+            while ($row = $result->fetch_assoc()) {
+                $quizSetData = [
+                    'id' => (int) $row['id'],
+                    'folder_id' => (int) $row['folder_id'],
+                    'name' => $row['name'],
+                    'description' => $row['description'],
+                    'icon_path' => $row['icon_path'],
+                    'access_type' => $row['access_type'],
+                    'status' => $row['status'],
+                    'question_count' => (int) $row['question_count'],
+                    'total_questions' => (int) $row['total_questions'],
+                    'duration_minutes' => (int) $row['duration_minutes'],
+                    'passing_score' => (int) $row['passing_score'],
+                    'is_published' => (bool) $row['is_published'],
+                    'created_by' => $row['created_by'],
+                    'created_at' => $row['created_at'],
+                    'updated_at' => $row['updated_at'],
+                    'folder_name' => $row['folder_name'],
+                    'folder_icon_path' => $row['folder_icon_path']
+                ];
+                $quizSets[] = $quizSetData;
+            }
+
+            $stmt->close();
+
+            // Execute count query (reuse params except limit/offset)
+            $countParams = array_slice($params, 0, -2);
+            $countTypes = substr($types, 0, -2);
+
+            $countStmt = \EMA\Config\Database::prepare($countQuery);
+
+            // Only bind parameters if we have them
+            if (!empty($countParams) && !empty($countTypes)) {
+                $countStmt->bind_param($countTypes, ...$countParams);
+            }
+
+            $countStmt->execute();
+            $total = $countStmt->get_result()->fetch_assoc()['total'];
+            $countStmt->close();
+
+            $pagination = \EMA\Utils\Pagination::getMetadata($page, $perPage, $total);
+
+            return [
+                'quiz_sets' => $quizSets,
+                'pagination' => $pagination,
+                'total' => $total
+            ];
+        } catch (\Exception $e) {
+            Logger::error('Error getting all quiz sets paginated', [
+                'page' => $page,
+                'per_page' => $perPage,
+                'folder_id' => $folderId,
+                'access_type' => $accessType,
+                'status' => $status,
+                'error' => $e->getMessage()
+            ]);
+            return [
+                'quiz_sets' => [],
+                'pagination' => \EMA\Utils\Pagination::getMetadata($page, $perPage, 0),
+                'total' => 0
+            ];
+        }
+    }
+
+    /**
+     * Get quiz sets accessible to logged-in user with pagination
+     * @param int $userId User ID
+     * @param int $page Page number
+     * @param int $perPage Items per page
+     * @param int|null $folderId Optional folder filter
+     * @param string|null $accessType Optional access type filter
+     * @param string|null $status Optional status filter
+     * @param bool $includeQuestionCount Include question count in results
+     * @return array Paginated quiz sets with metadata
+     */
+    public static function getLoggedInQuizSetsPaginated(int $userId, int $page, int $perPage, ?int $folderId = null, ?string $accessType = null, ?string $status = null, bool $includeQuestionCount = false): array
+    {
+        try {
+            // Build base query - quiz sets that are public, logged_in, or private with permission
+            $query = "
+                SELECT DISTINCT qs.id, qs.folder_id, qs.name, qs.description, qs.icon_path,
+                       qs.access_type, qs.status, qs.question_count, qs.total_questions,
+                       qs.duration_minutes, qs.passing_score, qs.is_published,
+                       qs.created_by, qs.created_at, qs.updated_at,
+                       fl.name as folder_name,
+                       fl.icon_path as folder_icon_path
+                FROM quiz_sets qs
+                LEFT JOIN folders fl ON qs.folder_id = fl.id
+                LEFT JOIN access_permissions ap ON (ap.item_id = qs.id AND ap.item_type = 'quiz_set' AND ap.identifier = ? AND ap.is_active = 1)
+                WHERE qs.status = ?
+                AND (
+                    qs.access_type = ?
+                    OR qs.access_type = ?
+                    OR (qs.access_type = ? AND ap.id IS NOT NULL)
+                )
+            ";
+
+            // Build count query
+            $countQuery = "
+                SELECT COUNT(DISTINCT qs.id) as total
+                FROM quiz_sets qs
+                LEFT JOIN access_permissions ap ON (ap.item_id = qs.id AND ap.item_type = 'quiz_set' AND ap.identifier = ? AND ap.is_active = 1)
+                WHERE qs.status = ?
+                AND (
+                    qs.access_type = ?
+                    OR qs.access_type = ?
+                    OR (qs.access_type = ? AND ap.id IS NOT NULL)
+                )
+            ";
+
+            // Build base parameters
+            $identifier = 'user_' . $userId;
+            $params = [$identifier, Constants::STATUS_PUBLISHED, Constants::ACCESS_ALL, Constants::ACCESS_LOGGED_IN, Constants::ACCESS_PRIVATE];
+            $types = 'sssss';
+            $countParams = [$identifier, Constants::STATUS_PUBLISHED, Constants::ACCESS_ALL, Constants::ACCESS_LOGGED_IN, Constants::ACCESS_PRIVATE];
+            $countTypes = 'sssss';
+
+            // Add folder filter if provided
+            if ($folderId !== null) {
+                $query .= " AND qs.folder_id = ?";
+                $countQuery .= " AND qs.folder_id = ?";
+                $params[] = $folderId;
+                $countParams[] = $folderId;
+                $types .= 'i';
+                $countTypes .= 'i';
+            }
+
+            // Add access type filter if provided
+            if ($accessType !== null) {
+                $query .= " AND qs.access_type = ?";
+                $countQuery .= " AND qs.access_type = ?";
+                $params[] = $accessType;
+                $countParams[] = $accessType;
+                $types .= 's';
+                $countTypes .= 's';
+            }
+
+            // Add status filter if provided (overrides the published status requirement)
+            if ($status !== null) {
+                // Remove the default status filter and add custom one
+                $query = str_replace("WHERE qs.status = ?", "WHERE 1=1", $query);
+                $countQuery = str_replace("WHERE qs.status = ?", "WHERE 1=1", $countQuery);
+
+                // Remove the STATUS_PUBLISHED from params
+                array_splice($params, 1, 1);
+                array_splice($countParams, 1, 1);
+                $types = 'ssss'; // Remove one 's'
+                $countTypes = 'ssss';
+
+                $query .= " AND qs.status = ?";
+                $countQuery .= " AND qs.status = ?";
+                $params[] = $status;
+                $countParams[] = $status;
+                $types .= 's';
+                $countTypes .= 's';
+            }
+
+            $query .= " ORDER BY qs.created_at DESC LIMIT ? OFFSET ?";
+
+            $offset = \EMA\Utils\Pagination::getOffset($page, $perPage);
+            $params[] = $perPage;
+            $params[] = $offset;
+            $types .= 'ii';
+
+            // Execute main query
+            $stmt = \EMA\Config\Database::prepare($query);
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            $quizSets = [];
+            while ($row = $result->fetch_assoc()) {
+                $quizSetData = [
+                    'id' => (int) $row['id'],
+                    'folder_id' => (int) $row['folder_id'],
+                    'name' => $row['name'],
+                    'description' => $row['description'],
+                    'icon_path' => $row['icon_path'],
+                    'access_type' => $row['access_type'],
+                    'status' => $row['status'],
+                    'question_count' => (int) $row['question_count'],
+                    'total_questions' => (int) $row['total_questions'],
+                    'duration_minutes' => (int) $row['duration_minutes'],
+                    'passing_score' => (int) $row['passing_score'],
+                    'is_published' => (bool) $row['is_published'],
+                    'created_by' => $row['created_by'],
+                    'created_at' => $row['created_at'],
+                    'updated_at' => $row['updated_at'],
+                    'folder_name' => $row['folder_name'],
+                    'folder_icon_path' => $row['folder_icon_path']
+                ];
+                $quizSets[] = $quizSetData;
+            }
+
+            $stmt->close();
+
+            // Execute count query (reuse params except limit/offset)
+            $finalCountParams = array_slice($params, 0, -2);
+            $finalCountTypes = substr($types, 0, -2);
+
+            $countStmt = \EMA\Config\Database::prepare($countQuery);
+            $countStmt->bind_param($finalCountTypes, ...$finalCountParams);
+            $countStmt->execute();
+            $total = $countStmt->get_result()->fetch_assoc()['total'];
+            $countStmt->close();
+
+            $pagination = \EMA\Utils\Pagination::getMetadata($page, $perPage, $total);
+
+            return [
+                'quiz_sets' => $quizSets,
+                'pagination' => $pagination,
+                'total' => $total
+            ];
+        } catch (\Exception $e) {
+            Logger::error('Error getting logged-in quiz sets paginated', [
+                'user_id' => $userId,
+                'page' => $page,
+                'per_page' => $perPage,
+                'folder_id' => $folderId,
+                'access_type' => $accessType,
+                'status' => $status,
+                'error' => $e->getMessage()
+            ]);
+            return [
+                'quiz_sets' => [],
+                'pagination' => \EMA\Utils\Pagination::getMetadata($page, $perPage, 0),
+                'total' => 0
             ];
         }
     }
