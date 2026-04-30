@@ -50,9 +50,9 @@ class QuizService
 
         // Validate access_type
         if (isset($data['access_type'])) {
-            $validAccessTypes = ['all', 'logged_in', 'private'];
+            $validAccessTypes = ['all', 'logged_in'];
             if (!in_array($data['access_type'], $validAccessTypes)) {
-                $errors[] = 'Invalid access type. Must be: all, logged_in, or private';
+                $errors[] = 'Invalid access type. Must be: all or logged_in';
             }
         }
 

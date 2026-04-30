@@ -103,6 +103,20 @@ class QuizSet
             // Insert quiz set
             $query = "INSERT INTO quiz_sets (folder_id, name, description, icon_path, access_type, duration_minutes, passing_score, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt = \EMA\Config\Database::prepare($query);
+            
+            // Debug logging
+            Logger::log('QuizSet::create - Binding parameters', [
+                'folderId' => $folderId,
+                'name' => $name,
+                'description' => $description,
+                'iconPath' => $iconPath,
+                'accessType' => $accessType,
+                'accessType_length' => strlen($accessType),
+                'durationMinutes' => $durationMinutes,
+                'passingScore' => $passingScore,
+                'createdBy' => $createdBy
+            ]);
+            
             $stmt->bind_param('isssisii', $folderId, $name, $description, $iconPath, $accessType, $durationMinutes, $passingScore, $createdBy);
 
             if ($stmt->execute()) {

@@ -108,8 +108,8 @@ class FileController
                 }
 
                 $iconFilename = 'icon_' . bin2hex(random_bytes(16)) . '.' . $iconValidation['extension'];
-                $iconPath = 'uploads/icons/' . $iconFilename;
-                $iconFullPath = ROOT_PATH . '/' . $iconPath;
+                $iconPath = 'icons/' . $iconFilename; // Save without uploads/ prefix
+                $iconFullPath = ROOT_PATH . '/uploads/' . $iconPath; // Add uploads/ for file system
 
                 if (!move_uploaded_file($iconData['tmp_name'], $iconFullPath)) {
                     unlink($fullPath);
