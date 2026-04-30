@@ -1063,3 +1063,4 @@
 [2026-04-30T17:46:25.219321+00:00] stack.INFO: QuizSet::create - Binding parameters {"query":"INSERT INTO quiz_sets (folder_id, name, access_type, status, is_published, duration_minutes, passing_score, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)","types":"isssiiii","params":[117,"Draft Quiz","all","draft",0,30,70,48]} []
 [2026-04-30T17:46:25.219369+00:00] stack.INFO: QuizSet::create - Executing query [] []
 [2026-04-30T17:46:25.220116+00:00] stack.INFO: QuizSet::create - Success {"quiz_set_id":349} []
+[2026-04-30T18:17:53.746151+00:00] stack.ERROR: PHP Error {"type":"Warning","message":"session_name(): Session name cannot be changed after headers have already been sent","file":"/home/doruk/Enterprise/theemaeducation/src/core/App.php","line":120} []
