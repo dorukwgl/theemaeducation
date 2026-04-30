@@ -4,10 +4,7 @@ namespace EMA\Controllers;
 
 use EMA\Models\File;
 use EMA\Models\Folder;
-use EMA\Models\Access;
-use EMA\Utils\Validator;
 use EMA\Utils\Logger;
-use EMA\Utils\Security;
 use EMA\Core\Request;
 use EMA\Core\Response;
 use EMA\Middleware\AuthMiddleware;
@@ -76,10 +73,8 @@ class FileController
             // Generate secure filename using UUID
             $extension = $validationResult['extension'];
             $secureFilename = 'file_' . bin2hex(random_bytes(16)) . '.' . $extension;
-            $filePath = 'uploads/files/' . $secureFilename;
-
-            // Move file to uploads directory
-            $fullPath = ROOT_PATH . '/' . $filePath;
+            $filePath = 'files/' . $secureFilename; // Save without uploads/ prefix
+            $fullPath = ROOT_PATH . '/uploads/' . $filePath; // Add uploads/ for file system
             $uploadDir = dirname($fullPath);
 
             if (!is_dir($uploadDir)) {
@@ -593,6 +588,123 @@ class FileController
                 'trace' => $e->getTraceAsString()
             ]);
             $this->response->error('Failed to retrieve folder files', 500);
+        }
+    }
+
+    /**
+     * Update file
+     * @param int $id File ID
+     */
+    public function update(int $id): void
+    {
+        try {
+            // Check if file exists
+            $file = File::findById($id);
+            if (!$file) {
+                $this->response->error('File not found', 404);
+                return;
+            }
+
+            Logger::log("file: " . json_encode($file));
+
+            $data = $this->request->allInput();
+            if (empty($data) && !isset($_FILES['file']) && !isset($_FILES['icon'])) {
+                $this->response->error('No data provided', 400);
+                return;
+            }
+
+            Logger::log("data: " . json_encode($this->request->allJsonParameters()));
+
+            // Handle file upload if present
+            if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
+                $uploadedFile = $_FILES['file'];
+
+                // Validate file upload
+                $validationResult = $this->validateFileUpload($uploadedFile);
+                if (!$validationResult['valid']) {
+                    $this->response->error($validationResult['message'], 400);
+                    return;
+                }
+
+                // Generate secure filename
+                $extension = $validationResult['extension'];
+                $secureFilename = 'file_' . bin2hex(random_bytes(16)) . '.' . $extension;
+                $filePath = 'files/' . $secureFilename; // Save without uploads/ prefix
+                $fullPath = ROOT_PATH . '/uploads/' . $filePath; // Add uploads/ for file system
+                $uploadDir = dirname($fullPath);
+
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0755, true);
+                }
+
+                Logger::log("Moving file from " . $uploadedFile['tmp_name'] . " to " . $fullPath);
+
+                if (!move_uploaded_file($uploadedFile['tmp_name'], $fullPath)) {
+                    $this->response->error('Failed to upload file', 500);
+                    return;
+                }
+
+                chmod($fullPath, 0644);
+                $data['file_path'] = $filePath;
+            }
+
+            // Handle icon upload if present
+            if (isset($_FILES['icon']) && $_FILES['icon']['error'] === UPLOAD_ERR_OK) {
+                $iconData = $_FILES['icon'];
+                $iconValidation = $this->validateIconUpload($iconData);
+
+                if (!$iconValidation['valid']) {
+                    $this->response->error($iconValidation['message'], 400);
+                    return;
+                }
+
+                $iconFilename = 'icon_' . bin2hex(random_bytes(16)) . '.' . $iconValidation['extension'];
+                $iconPath = 'icons/' . $iconFilename; // Save without uploads/ prefix
+                $iconFullPath = ROOT_PATH . '/uploads/' . $iconPath; // Add uploads/ for file system
+
+                if (!move_uploaded_file($iconData['tmp_name'], $iconFullPath)) {
+                    $this->response->error('Failed to upload icon', 500);
+                    return;
+                }
+
+                chmod($iconFullPath, 0644);
+                $data['icon_path'] = $iconPath;
+            }
+
+            // Validate folder_id if provided
+            if (isset($data['folder_id'])) {
+                $folderId = (int) $data['folder_id'];
+                $folder = Folder::findById($folderId);
+                if (!$folder) {
+                    $this->response->error('Folder not found', 404);
+                    return;
+                }
+            }
+
+            // Validate access_type if provided
+            if (isset($data['access_type'])) {
+                if (!in_array($data['access_type'], ['all', 'logged_in'])) {
+                    $this->response->error('Invalid access type. Must be "all" or "logged_in"', 400);
+                    return;
+                }
+            }
+
+            // Update file
+            $result = File::update($id, $data);
+
+            if ($result) {
+                $updatedFile = File::findById($id);
+                $this->response->success($updatedFile, 'File updated successfully');
+            } else {
+                $this->response->error('Failed to update file', 500);
+            }
+        } catch (\Exception $e) {
+            Logger::error('File update error', [
+                'file_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->response->error('Failed to update file', 500);
         }
     }
 }

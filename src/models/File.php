@@ -153,6 +153,14 @@ class File
 
             // Handle file_path update
             if (isset($data['file_path'])) {
+                // Delete old file if exists
+                if ($file['file_path']) {
+                    $oldFilePath = ROOT_PATH . '/uploads/' . $file['file_path']; // Add uploads/ prefix for file system
+                    if (file_exists($oldFilePath)) {
+                        unlink($oldFilePath);
+                    }
+                }
+
                 $updates[] = 'file_path = ?';
                 $types .= 's';
                 $params[] = $data['file_path'];
@@ -161,8 +169,11 @@ class File
             // Handle icon_path update
             if (isset($data['icon_path'])) {
                 // Delete old icon if exists
-                if ($file['icon_path'] && file_exists(ROOT_PATH . '/' . $file['icon_path'])) {
-                    unlink(ROOT_PATH . '/' . $file['icon_path']);
+                if ($file['icon_path']) {
+                    $oldIconPath = ROOT_PATH . '/uploads/' . $file['icon_path']; // Add uploads/ prefix for file system
+                    if (file_exists($oldIconPath)) {
+                        unlink($oldIconPath);
+                    }
                 }
 
                 $updates[] = 'icon_path = ?';
