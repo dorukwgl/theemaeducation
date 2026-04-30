@@ -8,56 +8,20 @@ use EMA\Utils\Logger;
 class Access
 {
     /**
-     * Check if user has access to an item
+     * Check if user has individual permission access to an item
+     * This method focuses ONLY on individual permission checking in access_permissions table.
+     * Access type and status checking should be handled by the respective Item models.
+     * Admin bypass and access_type logic should be handled by the calling models.
+     *
      * @param int $userId User ID to check
      * @param int $itemId File, quiz set or folder ID
      * @param string $itemType 'file', 'quiz_set' or 'folder'
-     * @return bool true if user has access, false otherwise
+     * @return bool true if user has individual permission access, false otherwise
      */
     public static function checkAccess(int $userId, int $itemId, string $itemType): bool
     {
         try {
-            // Check if user is admin (always has access)
-            if (User::isAdminById($userId)) {
-                return true;
-            }
-
-            // Map item type to table name and check if supported
-            $tableMap = [
-                'file' => 'files',
-                'quiz_set' => 'quiz_sets',
-                'folder' => 'folders'
-            ];
-
-            if (!array_key_exists($itemType, $tableMap)) {
-                return false; // Unsupported item type
-            }
-
-            $table = $tableMap[$itemType];
-            $stmt = Database::prepare("SELECT access_type FROM $table WHERE id = ? LIMIT 1");
-            $stmt->bind_param('i', $itemId);
-            $stmt->execute();
-            $result = $stmt->get_result();
-
-            if (!$result->num_rows) {
-                return false;
-            }
-
-            $item = $result->fetch_assoc();
-            $accessType = $item['access_type'];
-
-            // Public access
-            if ($accessType === 'all') {
-                return true;
-            }
-
-            // Logged-in access (user must be authenticated)
-            if ($accessType === 'logged_in') {
-                $user = User::findById($userId);
-                return $user !== null;
-            }
-
-            // Check individual user permission
+            // Check individual user permission only
             $identifier = 'user_' . $userId;
             $stmt = Database::prepare(
                 "SELECT access_times, times_accessed, is_active
@@ -88,7 +52,41 @@ class Access
             // Check if limit not exceeded
             return $permission['times_accessed'] < $permission['access_times'];
         } catch (\Exception $e) {
-            Logger::error('Error checking access', [
+            Logger::error('Error checking access permission', [
+                'user_id' => $userId,
+                'item_id' => $itemId,
+                'item_type' => $itemType,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Check if user has any permission record for an item (regardless of access limits)
+     * This is useful for checking if a user has been granted private access
+     *
+     * @param int $userId User ID to check
+     * @param int $itemId File, quiz set or folder ID
+     * @param string $itemType 'file', 'quiz_set' or 'folder'
+     * @return bool true if user has a permission record, false otherwise
+     */
+    public static function hasPermissionRecord(int $userId, int $itemId, string $itemType): bool
+    {
+        try {
+            $identifier = 'user_' . $userId;
+            $stmt = Database::prepare(
+                "SELECT id FROM access_permissions
+                 WHERE identifier = ? AND item_id = ? AND item_type = ? AND is_active = 1
+                 LIMIT 1"
+            );
+            $stmt->bind_param('sis', $identifier, $itemId, $itemType);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            return $result->num_rows > 0;
+        } catch (\Exception $e) {
+            Logger::error('Error checking permission record', [
                 'user_id' => $userId,
                 'item_id' => $itemId,
                 'item_type' => $itemType,
@@ -719,70 +717,75 @@ class Access
     }
 
     /**
-     * Get access statistics for an item
+     * Get individual permission access statistics for an item
+     * This method focuses ONLY on individual permission statistics in access_permissions table.
+     * Access type statistics should be handled by the respective Item models.
+     *
      * @param int $itemId File or quiz set ID
-     * @param string $itemType 'file' or 'quiz_set'
-     * @return array Access statistics
+     * @param string $itemType 'file', 'quiz_set' or 'folder'
+     * @return array Individual permission access statistics
      */
     public static function getAccessStats(int $itemId, string $itemType): array
     {
         try {
             $stats = [];
 
-            // Total users with access
+            // Total users with individual access permissions
             $stmt1 = Database::prepare(
                 "SELECT COUNT(*) as total FROM access_permissions
                  WHERE item_id = ? AND item_type = ? AND is_active = 1"
             );
             $stmt1->bind_param('is', $itemId, $itemType);
             $stmt1->execute();
-            $stats['total_users_with_access'] = (int) $stmt1->get_result()->fetch_assoc()['total'];
+            $stats['total_users_with_individual_access'] = (int) $stmt1->get_result()->fetch_assoc()['total'];
 
-            // Total accesses
+            // Total accesses from individual permissions
             $stmt2 = Database::prepare(
                 "SELECT SUM(times_accessed) as total FROM access_permissions
                  WHERE item_id = ? AND item_type = ?"
             );
             $stmt2->bind_param('is', $itemId, $itemType);
             $stmt2->execute();
-            $stats['total_accesses'] = (int) ($stmt2->get_result()->fetch_assoc()['total'] ?? 0);
+            $stats['total_individual_accesses'] = (int) ($stmt2->get_result()->fetch_assoc()['total'] ?? 0);
 
             // Average accesses per user
-            if ($stats['total_users_with_access'] > 0) {
-                $stats['average_accesses'] = round($stats['total_accesses'] / $stats['total_users_with_access'], 2);
+            if ($stats['total_users_with_individual_access'] > 0) {
+                $stats['average_accesses_per_user'] = round($stats['total_individual_accesses'] / $stats['total_users_with_individual_access'], 2);
             } else {
-                $stats['average_accesses'] = 0;
+                $stats['average_accesses_per_user'] = 0;
             }
 
-            // Public access status
-            $table = $itemType === 'file' ? 'files' : 'quiz_sets';
-            $stmt3 = Database::prepare("SELECT access_type FROM $table WHERE id = ? LIMIT 1");
-            $stmt3->bind_param('i', $itemId);
+            // Users with unlimited access
+            $stmt3 = Database::prepare(
+                "SELECT COUNT(*) as total FROM access_permissions
+                 WHERE item_id = ? AND item_type = ? AND is_active = 1 AND access_times = 0"
+            );
+            $stmt3->bind_param('is', $itemId, $itemType);
             $stmt3->execute();
-            $result3 = $stmt3->get_result();
+            $stats['users_with_unlimited_access'] = (int) $stmt3->get_result()->fetch_assoc()['total'];
 
-            if ($result3->num_rows > 0) {
-                $item = $result3->fetch_assoc();
-                $stats['is_public'] = $item['access_type'] === 'all';
-                $stats['is_logged_in_only'] = $item['access_type'] === 'logged_in';
-            } else {
-                $stats['is_public'] = false;
-                $stats['is_logged_in_only'] = false;
-            }
+            // Users with limited access
+            $stmt4 = Database::prepare(
+                "SELECT COUNT(*) as total FROM access_permissions
+                 WHERE item_id = ? AND item_type = ? AND is_active = 1 AND access_times > 0"
+            );
+            $stmt4->bind_param('is', $itemId, $itemType);
+            $stmt4->execute();
+            $stats['users_with_limited_access'] = (int) $stmt4->get_result()->fetch_assoc()['total'];
 
             return $stats;
         } catch (\Exception $e) {
-            Logger::error('Error getting access stats', [
+            Logger::error('Error getting individual access stats', [
                 'item_id' => $itemId,
                 'item_type' => $itemType,
                 'error' => $e->getMessage()
             ]);
             return [
-                'total_users_with_access' => 0,
-                'total_accesses' => 0,
-                'average_accesses' => 0,
-                'is_public' => false,
-                'is_logged_in_only' => false
+                'total_users_with_individual_access' => 0,
+                'total_individual_accesses' => 0,
+                'average_accesses_per_user' => 0,
+                'users_with_unlimited_access' => 0,
+                'users_with_limited_access' => 0
             ];
         }
     }
