@@ -51,8 +51,8 @@ class FileController
 
             // Validate access_type
             $accessType = $data['access_type'] ?? 'logged_in';
-            if (!in_array($accessType, ['all', 'logged_in'])) {
-                $this->response->error('Invalid access type. Must be "all" or "logged_in"', 400);
+            if (!in_array($accessType, ['all', 'logged_in', 'private'])) {
+                $this->response->error('Invalid access type. Must be "all", "logged_in", or "private"', 400);
                 return;
             }
 
@@ -258,15 +258,26 @@ class FileController
     /**
      * Display file inline (for images, videos, etc.)
      * GET /api/files/{id}
+     * Requires authentication
      */
     public function show(int $id): void
     {
         try {
+            // Get current user
+            $currentUser = AuthMiddleware::getCurrentUser();
+            $userId = $currentUser['id'] ?? null;
+
             // Get file details
             $file = File::findById($id);
 
             if (!$file) {
                 $this->response->error('File not found', 404);
+                return;
+            }
+
+            // Check access using File model's access control
+            if (!File::checkFileAccess($userId, $id)) {
+                $this->response->error('You do not have permission to access this file', 403);
                 return;
             }
 
@@ -317,15 +328,26 @@ class FileController
     /**
      * Download file
      * GET /api/files/{id}/download
+     * Requires authentication
      */
     public function download(int $id): void
     {
         try {
+            // Get current user
+            $currentUser = AuthMiddleware::getCurrentUser();
+            $userId = $currentUser['id'] ?? null;
+
             // Get file details
             $file = File::findById($id);
 
             if (!$file) {
                 $this->response->error('File not found', 404);
+                return;
+            }
+
+            // Check access using File model's access control
+            if (!File::checkFileAccess($userId, $id)) {
+                $this->response->error('You do not have permission to download this file', 403);
                 return;
             }
 
@@ -561,10 +583,17 @@ class FileController
             // Extract optional filters
             $search = $this->request->getQueryParameter('search');
             $accessType = $this->request->getQueryParameter('access_type');
+            $status = $this->request->getQueryParameter('status');
 
             // Validate access_type parameter
-            if ($accessType && !in_array($accessType, ['all', 'logged_in'])) {
-                $this->response->error('Invalid access_type parameter. Must be "all" or "logged_in"', 400);
+            if ($accessType && !in_array($accessType, ['all', 'logged_in', 'private'])) {
+                $this->response->error('Invalid access_type parameter. Must be "all", "logged_in", or "private"', 400);
+                return;
+            }
+
+            // Validate status parameter
+            if ($status && !in_array($status, ['active', 'inactive'])) {
+                $this->response->error('Invalid status parameter. Must be "active" or "inactive"', 400);
                 return;
             }
 
@@ -572,7 +601,7 @@ class FileController
             $userId = ($currentUser['role'] === 'admin') ? null : $currentUser['id'];
 
             // Get paginated files with access control
-            $result = File::getFilesByFolderPaginated($folderId, $page, $perPage, $search, $accessType, $userId);
+            $result = File::getFilesByFolderPaginated($folderId, $page, $perPage, $search, $accessType, $status, $userId);
 
             // Get total files count for access info
             $totalFilesInFolder = File::getFilesByFolderCount($folderId, null, null, null);
@@ -695,8 +724,16 @@ class FileController
 
             // Validate access_type if provided
             if (isset($data['access_type'])) {
-                if (!in_array($data['access_type'], ['all', 'logged_in'])) {
-                    $this->response->error('Invalid access type. Must be "all" or "logged_in"', 400);
+                if (!in_array($data['access_type'], ['all', 'logged_in', 'private'])) {
+                    $this->response->error('Invalid access type. Must be "all", "logged_in", or "private"', 400);
+                    return;
+                }
+            }
+
+            // Validate status if provided
+            if (isset($data['status'])) {
+                if (!in_array($data['status'], ['active', 'inactive'])) {
+                    $this->response->error('Invalid status. Must be "active" or "inactive"', 400);
                     return;
                 }
             }
@@ -717,6 +754,386 @@ class FileController
                 'trace' => $e->getTraceAsString()
             ]);
             $this->response->error('Failed to update file', 500);
+        }
+    }
+
+    /**
+     * Public index - Get all public active files
+     * GET /api/public/files
+     * No authentication required
+     */
+    public function publicIndex(): void
+    {
+        try {
+            // Extract pagination parameters
+            $page = (int) ($this->request->getQueryParameter('page', 1));
+            $perPage = (int) ($this->request->getQueryParameter('per_page', 20));
+
+            // Validate pagination parameters
+            $validation = Validator::make([
+                'page' => $page,
+                'per_page' => $perPage
+            ], [
+                'page' => 'integer|min:1',
+                'per_page' => 'integer|between:1,100'
+            ]);
+
+            if (!$validation->validate()) {
+                $this->response->validationError($validation->getErrors(), 'Invalid pagination parameters');
+                return;
+            }
+
+            // Extract optional filters
+            $search = $this->request->getQueryParameter('search');
+            $folderId = $this->request->getQueryParameter('folder_id');
+
+            // Validate folder_id if provided
+            if ($folderId) {
+                $folderId = (int) $folderId;
+                $folder = Folder::findById($folderId);
+                if (!$folder) {
+                    $this->response->error('Folder not found', 404);
+                    return;
+                }
+            }
+
+            // Get public active files
+            $result = File::getPublicFilesPaginated($page, $perPage, $search, $folderId);
+
+            $this->response->success($result, 'Public files retrieved successfully');
+        } catch (\Exception $e) {
+            Logger::error('Public files listing error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->response->error('Failed to retrieve public files', 500);
+        }
+    }
+
+    /**
+     * Public show - Display a public active file inline
+     * GET /api/public/files/{id}
+     * No authentication required
+     */
+    public function publicShow(int $id): void
+    {
+        try {
+            // Get file details
+            $file = File::findById($id);
+
+            if (!$file) {
+                $this->response->error('File not found', 404);
+                return;
+            }
+
+            // Check if file is public and active using File model
+            if (!File::isFilePublic($id) || !File::isFileActive($id)) {
+                $this->response->error('File is not publicly available', 403);
+                return;
+            }
+
+            // Validate file path (prevent directory traversal)
+            $fullFilePath = ROOT_PATH . '/' . $file['file_path'];
+            $realPath = realpath($fullFilePath);
+            $uploadsPath = realpath(ROOT_PATH . '/uploads/files/');
+
+            if (!$realPath || strpos($realPath, $uploadsPath) !== 0) {
+                $this->response->error('Invalid file path', 403);
+                return;
+            }
+
+            // Check if file exists
+            if (!file_exists($fullFilePath)) {
+                $this->response->error('File not found', 404);
+                return;
+            }
+
+            // Determine content type
+            $extension = strtolower(pathinfo($file['file_path'], PATHINFO_EXTENSION));
+            $contentType = $this->getContentType($extension);
+
+            // Get file size
+            $fileSize = filesize($fullFilePath);
+
+            // Set inline display headers (for images, videos, etc.)
+            header('Content-Type: ' . $contentType);
+            header('Content-Disposition: inline; filename="' . $file['name'] . '"');
+            header('Content-Length: ' . $fileSize);
+            header('Cache-Control: public, max-age=31536000'); // 1 year cache
+            header('Expires: ' . gmdate('D, d M Y H:i:s \G\M\T', time() + 31536000));
+
+            // Stream file to client
+            if ($fileHandle = fopen($fullFilePath, 'rb')) {
+                while (!feof($fileHandle)) {
+                    echo fread($fileHandle, 8192); // 8KB chunks
+                }
+                fclose($fileHandle);
+            } else {
+                $this->response->error('Failed to display file', 500);
+            }
+        } catch (\Exception $e) {
+            $this->response->error('Failed to display file', 500);
+        }
+    }
+
+    /**
+     * Public download - Download a public active file
+     * GET /api/public/files/{id}/download
+     * No authentication required
+     */
+    public function publicDownload(int $id): void
+    {
+        try {
+            // Get file details
+            $file = File::findById($id);
+
+            if (!$file) {
+                $this->response->error('File not found', 404);
+                return;
+            }
+
+            // Check if file is public and active using File model
+            if (!File::isFilePublic($id) || !File::isFileActive($id)) {
+                $this->response->error('File is not publicly available', 403);
+                return;
+            }
+
+            // Validate file path (prevent directory traversal)
+            $fullFilePath = ROOT_PATH . '/' . $file['file_path'];
+            $realPath = realpath($fullFilePath);
+            $uploadsPath = realpath(ROOT_PATH . '/uploads/files/');
+
+            if (!$realPath || strpos($realPath, $uploadsPath) !== 0) {
+                $this->response->error('Invalid file path', 403);
+                return;
+            }
+
+            // Check if file exists
+            if (!file_exists($fullFilePath)) {
+                $this->response->error('File not found', 404);
+                return;
+            }
+
+            // Determine content type
+            $extension = strtolower(pathinfo($file['file_path'], PATHINFO_EXTENSION));
+            $contentType = $this->getContentType($extension);
+
+            // Get file size
+            $fileSize = filesize($fullFilePath);
+
+            // Generate safe filename for download
+            $safeFilename = $this->generateSafeFilename($file['name']);
+
+            // Set download headers
+            header('Content-Type: ' . $contentType);
+            header('Content-Disposition: attachment; filename="' . $safeFilename . '"');
+            header('Content-Length: ' . $fileSize);
+            header('Cache-Control: no-cache, must-revalidate');
+            header('Pragma: no-cache');
+            header('Expires: 0');
+
+            // Stream file to client
+            if ($fileHandle = fopen($fullFilePath, 'rb')) {
+                while (!feof($fileHandle)) {
+                    echo fread($fileHandle, 8192); // 8KB chunks
+                }
+                fclose($fileHandle);
+            } else {
+                $this->response->error('Failed to download file', 500);
+            }
+        } catch (\Exception $e) {
+            $this->response->error('Failed to download file', 500);
+        }
+    }
+
+    /**
+     * Authenticated index - Get files accessible to logged-in users
+     * GET /api/files
+     * Requires authentication
+     */
+    public function authenticatedIndex(): void
+    {
+        try {
+            // Get current user
+            $currentUser = AuthMiddleware::getCurrentUser();
+            $userId = $currentUser['id'];
+
+            // Extract pagination parameters
+            $page = (int) ($this->request->getQueryParameter('page', 1));
+            $perPage = (int) ($this->request->getQueryParameter('per_page', 20));
+
+            // Validate pagination parameters
+            $validation = Validator::make([
+                'page' => $page,
+                'per_page' => $perPage
+            ], [
+                'page' => 'integer|min:1',
+                'per_page' => 'integer|between:1,100'
+            ]);
+
+            if (!$validation->validate()) {
+                $this->response->validationError($validation->getErrors(), 'Invalid pagination parameters');
+                return;
+            }
+
+            // Extract optional filters
+            $search = $this->request->getQueryParameter('search');
+            $folderId = $this->request->getQueryParameter('folder_id');
+            $accessType = $this->request->getQueryParameter('access_type');
+            $status = $this->request->getQueryParameter('status');
+
+            // Validate folder_id if provided
+            if ($folderId) {
+                $folderId = (int) $folderId;
+                $folder = Folder::findById($folderId);
+                if (!$folder) {
+                    $this->response->error('Folder not found', 404);
+                    return;
+                }
+            }
+
+            // Validate access_type parameter
+            if ($accessType && !in_array($accessType, ['all', 'logged_in', 'private'])) {
+                $this->response->error('Invalid access_type parameter. Must be "all", "logged_in", or "private"', 400);
+                return;
+            }
+
+            // Validate status parameter
+            if ($status && !in_array($status, ['active', 'inactive'])) {
+                $this->response->error('Invalid status parameter. Must be "active" or "inactive"', 400);
+                return;
+            }
+
+            // Get files accessible to the user
+            // For admin users, get all files. For non-admin, get files based on access
+            if ($currentUser['role'] === 'admin') {
+                $result = File::getAllFilesPaginated($page, $perPage, $search, $folderId, $accessType, $status);
+            } else {
+                $result = File::getLoggedInFilesPaginated($userId, $page, $perPage, $search, $folderId, $accessType, $status);
+            }
+
+            $this->response->success($result, 'Files retrieved successfully');
+        } catch (\Exception $e) {
+            Logger::error('Authenticated files listing error', [
+                'user_id' => $currentUser['id'] ?? 'unknown',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->response->error('Failed to retrieve files', 500);
+        }
+    }
+
+    /**
+     * Update file status (Admin only)
+     * PUT /api/admin/files/{id}/status
+     */
+    public function updateStatus(int $id): void
+    {
+        try {
+            // Get current user (should be admin due to middleware)
+            $currentUser = AuthMiddleware::getCurrentUser();
+
+            // Get file details
+            $file = File::findById($id);
+            if (!$file) {
+                $this->response->error('File not found', 404);
+                return;
+            }
+
+            // Get new status from request
+            $data = $this->request->allInput();
+            $newStatus = $data['status'] ?? null;
+
+            if (!$newStatus) {
+                $this->response->error('Status is required', 400);
+                return;
+            }
+
+            // Validate status
+            if (!in_array($newStatus, ['active', 'inactive'])) {
+                $this->response->error('Invalid status. Must be "active" or "inactive"', 400);
+                return;
+            }
+
+            // Update status
+            $result = File::updateStatus($id, $newStatus);
+
+            if ($result) {
+                $updatedFile = File::findById($id);
+                Logger::log('File status updated', [
+                    'file_id' => $id,
+                    'old_status' => $file['status'],
+                    'new_status' => $newStatus,
+                    'updated_by' => $currentUser['id']
+                ]);
+                $this->response->success($updatedFile, 'File status updated successfully');
+            } else {
+                $this->response->error('Failed to update file status', 500);
+            }
+        } catch (\Exception $e) {
+            Logger::error('File status update error', [
+                'file_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->response->error('Failed to update file status', 500);
+        }
+    }
+
+    /**
+     * Update file access type (Admin only)
+     * PUT /api/admin/files/{id}/access-type
+     */
+    public function updateAccessType(int $id): void
+    {
+        try {
+            // Get current user (should be admin due to middleware)
+            $currentUser = AuthMiddleware::getCurrentUser();
+
+            // Get file details
+            $file = File::findById($id);
+            if (!$file) {
+                $this->response->error('File not found', 404);
+                return;
+            }
+
+            // Get new access type from request
+            $data = $this->request->allInput();
+            $newAccessType = $data['access_type'] ?? null;
+
+            if (!$newAccessType) {
+                $this->response->error('Access type is required', 400);
+                return;
+            }
+
+            // Validate access type
+            if (!in_array($newAccessType, ['all', 'logged_in', 'private'])) {
+                $this->response->error('Invalid access type. Must be "all", "logged_in", or "private"', 400);
+                return;
+            }
+
+            // Update access type
+            $result = File::updateAccessType($id, $newAccessType);
+
+            if ($result) {
+                $updatedFile = File::findById($id);
+                Logger::log('File access type updated', [
+                    'file_id' => $id,
+                    'old_access_type' => $file['access_type'],
+                    'new_access_type' => $newAccessType,
+                    'updated_by' => $currentUser['id']
+                ]);
+                $this->response->success($updatedFile, 'File access type updated successfully');
+            } else {
+                $this->response->error('Failed to update file access type', 500);
+            }
+        } catch (\Exception $e) {
+            Logger::error('File access type update error', [
+                'file_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->response->error('Failed to update file access type', 500);
         }
     }
 }

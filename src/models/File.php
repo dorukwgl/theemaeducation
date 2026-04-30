@@ -540,7 +540,7 @@ class File
      * @param bool $includeInactive Include inactive files (default: false)
      * @return array Paginated files with metadata
      */
-    public static function getFilesByFolderPaginated(int $folderId, int $page, int $perPage, ?string $search = null, ?string $accessType = null, ?int $userId = null, bool $includeInactive = false): array
+    public static function getFilesByFolderPaginated(int $folderId, int $page, int $perPage, ?string $search = null, ?string $accessType = null, ?string $status = null, ?int $userId = null): array
     {
         try {
             if (!\EMA\Models\Folder::findById($folderId)) {
@@ -570,10 +570,14 @@ class File
                 $types .= 's';
             }
 
-            if (!$includeInactive) {
+            if ($status && in_array($status, [Constants::STATUS_ACTIVE, Constants::STATUS_INACTIVE])) {
                 $query .= " AND f.status = ?";
-                $activeStatus = Constants::STATUS_ACTIVE;
-                $params[] = $activeStatus;
+                $params[] = $status;
+                $types .= 's';
+            } else {
+                // Default to active status if not specified
+                $query .= " AND f.status = ?";
+                $params[] = Constants::STATUS_ACTIVE;
                 $types .= 's';
             }
 
@@ -626,7 +630,7 @@ class File
 
             $stmt->close();
 
-            $total = self::getFilesByFolderCount($folderId, $search, $accessType, $userId, $includeInactive);
+            $total = self::getFilesByFolderCount($folderId, $search, $accessType, $status, $userId);
             $pagination = \EMA\Utils\Pagination::getMetadata($page, $perPage, $total);
 
             return [
@@ -659,7 +663,7 @@ class File
      * @param bool $includeInactive Include inactive files (default: false)
      * @return int Total count of matching files
      */
-    public static function getFilesByFolderCount(int $folderId, ?string $search = null, ?string $accessType = null, ?int $userId = null, bool $includeInactive = false): int
+    public static function getFilesByFolderCount(int $folderId, ?string $search = null, ?string $accessType = null, ?string $status = null, ?int $userId = null): int
     {
         try {
             $query = "
@@ -683,10 +687,14 @@ class File
                 $types .= 's';
             }
 
-            if (!$includeInactive) {
+            if ($status && in_array($status, [Constants::STATUS_ACTIVE, Constants::STATUS_INACTIVE])) {
                 $query .= " AND f.status = ?";
-                $activeStatus = Constants::STATUS_ACTIVE;
-                $params[] = $activeStatus;
+                $params[] = $status;
+                $types .= 's';
+            } else {
+                // Default to active status if not specified
+                $query .= " AND f.status = ?";
+                $params[] = Constants::STATUS_ACTIVE;
                 $types .= 's';
             }
 
@@ -871,31 +879,68 @@ class File
      * @param int $perPage Items per page
      * @return array Paginated public files
      */
-    public static function getPublicFilesPaginated(int $folderId, int $page, int $perPage): array
+    public static function getPublicFilesPaginated(int $page, int $perPage, ?string $search = null, ?int $folderId = null): array
     {
         try {
-            if (!\EMA\Models\Folder::findById($folderId)) {
-                return [];
+            // Validate folder if provided
+            if ($folderId !== null && !\EMA\Models\Folder::findById($folderId)) {
+                return [
+                    'files' => [],
+                    'pagination' => \EMA\Utils\Pagination::getMetadata($page, $perPage, 0),
+                    'total' => 0
+                ];
             }
 
+            // Build base query
             $query = "
                 SELECT f.id, f.name, f.file_path, f.icon_path, f.access_type, f.status, f.created_at,
                        fl.name as folder_name, fl.icon_path as folder_icon_path
                 FROM files f
                 LEFT JOIN folders fl ON f.folder_id = fl.id
-                WHERE f.folder_id = ?
-                AND f.access_type = ?
+                WHERE f.access_type = ?
                 AND f.status = ?
-                ORDER BY f.id DESC
-                LIMIT ? OFFSET ?
             ";
 
-            $offset = \EMA\Utils\Pagination::getOffset($page, $perPage);
+            // Build count query (same base conditions)
+            $countQuery = "
+                SELECT COUNT(*) as total
+                FROM files f
+                WHERE f.access_type = ?
+                AND f.status = ?
+            ";
 
+            // Build parameters arrays
+            $params = [Constants::ACCESS_ALL, Constants::STATUS_ACTIVE];
+            $types = 'ss';
+
+            // Add folder filter if provided
+            if ($folderId !== null) {
+                $query .= " AND f.folder_id = ?";
+                $countQuery .= " AND f.folder_id = ?";
+                $params[] = $folderId;
+                $types .= 'i';
+            }
+
+            // Add search filter if provided
+            if ($search !== null) {
+                $query .= " AND (f.name LIKE ? OR f.id LIKE ?)";
+                $countQuery .= " AND (f.name LIKE ? OR f.id LIKE ?)";
+                $searchParam = "%{$search}%";
+                $params[] = $searchParam;
+                $params[] = $searchParam;
+                $types .= 'ss';
+            }
+
+            $query .= " ORDER BY f.id DESC LIMIT ? OFFSET ?";
+
+            $offset = \EMA\Utils\Pagination::getOffset($page, $perPage);
+            $params[] = $perPage;
+            $params[] = $offset;
+            $types .= 'ii';
+
+            // Execute main query
             $stmt = \EMA\Config\Database::prepare($query);
-            $accessAll = Constants::ACCESS_ALL;
-            $statusActive = Constants::STATUS_ACTIVE;
-            $stmt->bind_param('issii', $folderId, $accessAll, $statusActive, $perPage, $offset);
+            $stmt->bind_param($types, ...$params);
             $stmt->execute();
             $result = $stmt->get_result();
 
@@ -916,19 +961,17 @@ class File
 
             $stmt->close();
 
-            // Count total public files
-            $countQuery = "
-                SELECT COUNT(*) as total
-                FROM files f
-                WHERE f.folder_id = ?
-                AND f.access_type = ?
-                AND f.status = ?
-            ";
+            // Execute count query (reuse params except limit/offset)
+            $countParams = array_slice($params, 0, -2);
+            $countTypes = substr($types, 0, -2);
 
             $countStmt = \EMA\Config\Database::prepare($countQuery);
-            $accessAll = Constants::ACCESS_ALL;
-            $statusActive = Constants::STATUS_ACTIVE;
-            $countStmt->bind_param('iss', $folderId, $accessAll, $statusActive);
+
+            // Only bind parameters if we have them
+            if (!empty($countParams) && !empty($countTypes)) {
+                $countStmt->bind_param($countTypes, ...$countParams);
+            }
+
             $countStmt->execute();
             $countResult = $countStmt->get_result();
             $total = (int) $countResult->fetch_assoc()['total'];
@@ -943,14 +986,318 @@ class File
             ];
         } catch (\Exception $e) {
             Logger::error('Error getting public files paginated', [
-                'folder_id' => $folderId,
                 'page' => $page,
                 'per_page' => $perPage,
+                'search' => $search,
+                'folder_id' => $folderId,
                 'error' => $e->getMessage()
             ]);
             return [
                 'files' => [],
-                'pagination' => \EMA\Utils\Pagination::getMetadata(1, $perPage, 0),
+                'pagination' => \EMA\Utils\Pagination::getMetadata($page, $perPage, 0),
+                'total' => 0
+            ];
+        }
+    }
+
+    /**
+     * Get all files with pagination (admin use)
+     * @param int $page Page number
+     * @param int $perPage Items per page
+     * @param string|null $search Search term
+     * @param int|null $folderId Optional folder filter
+     * @param string|null $accessType Optional access type filter
+     * @param string|null $status Optional status filter
+     * @return array Paginated files with metadata
+     */
+    public static function getAllFilesPaginated(int $page, int $perPage, ?string $search = null, ?int $folderId = null, ?string $accessType = null, ?string $status = null): array
+    {
+        try {
+            // Build base query
+            $query = "
+                SELECT f.id, f.name, f.file_path, f.icon_path, f.access_type, f.status, f.created_at,
+                       fl.name as folder_name, fl.icon_path as folder_icon_path
+                FROM files f
+                LEFT JOIN folders fl ON f.folder_id = fl.id
+                WHERE 1=1
+            ";
+
+            // Build count query
+            $countQuery = "SELECT COUNT(*) as total FROM files f WHERE 1=1";
+
+            // Build parameters arrays
+            $params = [];
+            $types = '';
+
+            // Add folder filter if provided
+            if ($folderId !== null) {
+                $query .= " AND f.folder_id = ?";
+                $countQuery .= " AND f.folder_id = ?";
+                $params[] = $folderId;
+                $types .= 'i';
+            }
+
+            // Add access type filter if provided
+            if ($accessType !== null) {
+                $query .= " AND f.access_type = ?";
+                $countQuery .= " AND f.access_type = ?";
+                $params[] = $accessType;
+                $types .= 's';
+            }
+
+            // Add status filter if provided
+            if ($status !== null) {
+                $query .= " AND f.status = ?";
+                $countQuery .= " AND f.status = ?";
+                $params[] = $status;
+                $types .= 's';
+            }
+
+            // Add search filter if provided
+            if ($search !== null) {
+                $query .= " AND (f.name LIKE ? OR f.id LIKE ?)";
+                $countQuery .= " AND (f.name LIKE ? OR f.id LIKE ?)";
+                $searchParam = "%{$search}%";
+                $params[] = $searchParam;
+                $params[] = $searchParam;
+                $types .= 'ss';
+            }
+
+            $query .= " ORDER BY f.id DESC LIMIT ? OFFSET ?";
+
+            $offset = \EMA\Utils\Pagination::getOffset($page, $perPage);
+            $params[] = $perPage;
+            $params[] = $offset;
+            $types .= 'ii';
+
+            // Execute main query
+            $stmt = \EMA\Config\Database::prepare($query);
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            $files = [];
+            while ($row = $result->fetch_assoc()) {
+                $files[] = [
+                    'id' => (int) $row['id'],
+                    'name' => $row['name'],
+                    'file_path' => $row['file_path'],
+                    'icon_path' => $row['icon_path'],
+                    'access_type' => $row['access_type'],
+                    'status' => $row['status'],
+                    'created_at' => $row['created_at'],
+                    'folder_name' => $row['folder_name'],
+                    'folder_icon_path' => $row['folder_icon_path']
+                ];
+            }
+
+            $stmt->close();
+
+            // Execute count query (reuse params except limit/offset)
+            $countParams = array_slice($params, 0, -2);
+            $countTypes = substr($types, 0, -2);
+
+            $countStmt = \EMA\Config\Database::prepare($countQuery);
+
+            // Only bind parameters if we have them
+            if (!empty($countParams) && !empty($countTypes)) {
+                $countStmt->bind_param($countTypes, ...$countParams);
+            }
+
+            $countStmt->execute();
+            $countResult = $countStmt->get_result();
+            $total = (int) $countResult->fetch_assoc()['total'];
+            $countStmt->close();
+
+            $pagination = \EMA\Utils\Pagination::getMetadata($page, $perPage, $total);
+
+            return [
+                'files' => $files,
+                'pagination' => $pagination,
+                'total' => $total
+            ];
+        } catch (\Exception $e) {
+            Logger::error('Error getting all files paginated', [
+                'page' => $page,
+                'per_page' => $perPage,
+                'search' => $search,
+                'folder_id' => $folderId,
+                'access_type' => $accessType,
+                'status' => $status,
+                'error' => $e->getMessage()
+            ]);
+            return [
+                'files' => [],
+                'pagination' => \EMA\Utils\Pagination::getMetadata($page, $perPage, 0),
+                'total' => 0
+            ];
+        }
+    }
+
+    /**
+     * Get files accessible to logged-in user with pagination
+     * @param int $userId User ID
+     * @param int $page Page number
+     * @param int $perPage Items per page
+     * @param string|null $search Search term
+     * @param int|null $folderId Optional folder filter
+     * @param string|null $accessType Optional access type filter
+     * @param string|null $status Optional status filter
+     * @return array Paginated files with metadata
+     */
+    public static function getLoggedInFilesPaginated(int $userId, int $page, int $perPage, ?string $search = null, ?int $folderId = null, ?string $accessType = null, ?string $status = null): array
+    {
+        try {
+            // Build base query - files that are public, logged_in, or private with permission
+            $query = "
+                SELECT DISTINCT f.id, f.name, f.file_path, f.icon_path, f.access_type, f.status, f.created_at,
+                       fl.name as folder_name, fl.icon_path as folder_icon_path
+                FROM files f
+                LEFT JOIN folders fl ON f.folder_id = fl.id
+                LEFT JOIN access_permissions ap ON (ap.item_id = f.id AND ap.item_type = 'file' AND ap.identifier = ? AND ap.is_active = 1)
+                WHERE f.status = ?
+                AND (
+                    f.access_type = ?
+                    OR f.access_type = ?
+                    OR (f.access_type = ? AND ap.id IS NOT NULL)
+                )
+            ";
+
+            // Build count query
+            $countQuery = "
+                SELECT COUNT(DISTINCT f.id) as total
+                FROM files f
+                LEFT JOIN access_permissions ap ON (ap.item_id = f.id AND ap.item_type = 'file' AND ap.identifier = ? AND ap.is_active = 1)
+                WHERE f.status = ?
+                AND (
+                    f.access_type = ?
+                    OR f.access_type = ?
+                    OR (f.access_type = ? AND ap.id IS NOT NULL)
+                )
+            ";
+
+            // Build base parameters
+            $identifier = 'user_' . $userId;
+            $params = [$identifier, Constants::STATUS_ACTIVE, Constants::ACCESS_ALL, Constants::ACCESS_LOGGED_IN, Constants::ACCESS_PRIVATE];
+            $types = 'sssss';
+            $countParams = [$identifier, Constants::STATUS_ACTIVE, Constants::ACCESS_ALL, Constants::ACCESS_LOGGED_IN, Constants::ACCESS_PRIVATE];
+            $countTypes = 'sssss';
+
+            // Add folder filter if provided
+            if ($folderId !== null) {
+                $query .= " AND f.folder_id = ?";
+                $countQuery .= " AND f.folder_id = ?";
+                $params[] = $folderId;
+                $countParams[] = $folderId;
+                $types .= 'i';
+                $countTypes .= 'i';
+            }
+
+            // Add access type filter if provided
+            if ($accessType !== null) {
+                $query .= " AND f.access_type = ?";
+                $countQuery .= " AND f.access_type = ?";
+                $params[] = $accessType;
+                $countParams[] = $accessType;
+                $types .= 's';
+                $countTypes .= 's';
+            }
+
+            // Add status filter if provided (overrides the active status requirement)
+            if ($status !== null) {
+                // Remove the default status filter and add custom one
+                $query = str_replace("WHERE f.status = ?", "WHERE 1=1", $query);
+                $countQuery = str_replace("WHERE f.status = ?", "WHERE 1=1", $countQuery);
+
+                // Remove the STATUS_ACTIVE from params
+                array_splice($params, 1, 1);
+                array_splice($countParams, 1, 1);
+                $types = 'ssss'; // Remove one 's'
+                $countTypes = 'ssss';
+
+                $query .= " AND f.status = ?";
+                $countQuery .= " AND f.status = ?";
+                $params[] = $status;
+                $countParams[] = $status;
+                $types .= 's';
+                $countTypes .= 's';
+            }
+
+            // Add search filter if provided
+            if ($search !== null) {
+                $query .= " AND (f.name LIKE ? OR f.id LIKE ?)";
+                $countQuery .= " AND (f.name LIKE ? OR f.id LIKE ?)";
+                $searchParam = "%{$search}%";
+                $params[] = $searchParam;
+                $params[] = $searchParam;
+                $countParams[] = $searchParam;
+                $countParams[] = $searchParam;
+                $types .= 'ss';
+                $countTypes .= 'ss';
+            }
+
+            $query .= " ORDER BY f.id DESC LIMIT ? OFFSET ?";
+
+            $offset = \EMA\Utils\Pagination::getOffset($page, $perPage);
+            $params[] = $perPage;
+            $params[] = $offset;
+            $types .= 'ii';
+
+            // Execute main query
+            $stmt = \EMA\Config\Database::prepare($query);
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            $files = [];
+            while ($row = $result->fetch_assoc()) {
+                $files[] = [
+                    'id' => (int) $row['id'],
+                    'name' => $row['name'],
+                    'file_path' => $row['file_path'],
+                    'icon_path' => $row['icon_path'],
+                    'access_type' => $row['access_type'],
+                    'status' => $row['status'],
+                    'created_at' => $row['created_at'],
+                    'folder_name' => $row['folder_name'],
+                    'folder_icon_path' => $row['folder_icon_path']
+                ];
+            }
+
+            $stmt->close();
+
+            // Execute count query (reuse params except limit/offset)
+            $finalCountParams = array_slice($params, 0, -2);
+            $finalCountTypes = substr($types, 0, -2);
+
+            $countStmt = \EMA\Config\Database::prepare($countQuery);
+            $countStmt->bind_param($finalCountTypes, ...$finalCountParams);
+            $countStmt->execute();
+            $countResult = $countStmt->get_result();
+            $total = (int) $countResult->fetch_assoc()['total'];
+            $countStmt->close();
+
+            $pagination = \EMA\Utils\Pagination::getMetadata($page, $perPage, $total);
+
+            return [
+                'files' => $files,
+                'pagination' => $pagination,
+                'total' => $total
+            ];
+        } catch (\Exception $e) {
+            Logger::error('Error getting logged-in files paginated', [
+                'user_id' => $userId,
+                'page' => $page,
+                'per_page' => $perPage,
+                'search' => $search,
+                'folder_id' => $folderId,
+                'access_type' => $accessType,
+                'status' => $status,
+                'error' => $e->getMessage()
+            ]);
+            return [
+                'files' => [],
+                'pagination' => \EMA\Utils\Pagination::getMetadata($page, $perPage, 0),
                 'total' => 0
             ];
         }
