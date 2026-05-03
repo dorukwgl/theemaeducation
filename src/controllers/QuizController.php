@@ -233,18 +233,10 @@ class QuizController
                 $data['icon'] = $_FILES['icon'];
             }
 
-            // Validate CSRF token
-            if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
-                $this->response->validationError(['csrf_token' => 'Invalid CSRF token']);
-                return;
-            }
-
             // Validate input data
             $validation = $this->quizService->validateQuizSetData($data);
-
             if (!$validation['success']) {
                 $this->response->validationError($validation['errors']);
-                return;
             }
 
             $sanitizedData = $validation['data'];
@@ -288,14 +280,6 @@ class QuizController
             $quizSet = QuizSet::findById($id);
             if (!$quizSet) {
                 $this->response->notFound('Quiz set not found');
-                return;
-            }
-
-            $data = $this->request->allInput();
-
-            // Validate CSRF token
-            if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
-                $this->response->validationError(['csrf_token' => 'Invalid CSRF token']);
                 return;
             }
 
