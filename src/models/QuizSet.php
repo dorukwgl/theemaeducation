@@ -216,8 +216,8 @@ class QuizSet
             // Handle icon_path update
             if (isset($data['icon_path'])) {
                 // Delete old icon if exists
-                if ($quizSet['icon_path'] && file_exists(ROOT_PATH . '/' . $quizSet['icon_path'])) {
-                    unlink(ROOT_PATH . '/' . $quizSet['icon_path']);
+                if ($quizSet['icon_path'] && file_exists(ROOT_PATH . '/uploads/' . $quizSet['icon_path'])) {
+                    unlink(ROOT_PATH . '/uploads/' . $quizSet['icon_path']);
                 }
 
                 $updates[] = 'icon_path = ?';
@@ -353,8 +353,8 @@ class QuizSet
                 // Delete quiz results (will cascade via foreign key)
 
                 // Delete icon file if exists
-                if ($quizSet['icon_path'] && file_exists(ROOT_PATH . '/' . $quizSet['icon_path'])) {
-                    unlink(ROOT_PATH . '/' . $quizSet['icon_path']);
+                if ($quizSet['icon_path'] && file_exists(ROOT_PATH . '/uploads/' . $quizSet['icon_path'])) {
+                    unlink(ROOT_PATH . '/uploads/' . $quizSet['icon_path']);
                 }
 
                 // Delete quiz set record

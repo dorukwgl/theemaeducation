@@ -168,6 +168,11 @@ class QuizController
             }
 
             $data = $this->request->allInput();
+            
+            // Include icon from files if present
+            if ($this->request->hasFile('icon')) {
+                $data['icon'] = $_FILES['icon'];
+            }
 
             // Validate input data
             $validation = $this->quizService->validateQuizSetData($data);
@@ -222,6 +227,11 @@ class QuizController
             }
 
             $data = $this->request->allInput();
+
+            // Include icon from files if present
+            if ($this->request->hasFile('icon')) {
+                $data['icon'] = $_FILES['icon'];
+            }
 
             // Validate CSRF token
             if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {

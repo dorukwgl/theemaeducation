@@ -57,10 +57,36 @@ class QuizService
         }
 
         // Validate icon upload
-        if (isset($data['icon']) && is_uploaded_file($data['icon'])) {
-            $iconValidation = $this->validateQuizIcon($data['icon']);
-            if (!$iconValidation['valid']) {
-                $errors = array_merge($errors, $iconValidation['errors']);
+        if (isset($data['icon'])) {
+            $iconData = $data['icon'];
+            
+            // Handle multipart upload array
+            if (is_array($iconData) && isset($iconData['tmp_name'])) {
+                $iconValidation = $this->validateQuizIcon($iconData);
+                if (!$iconValidation['valid']) {
+                    $errors = array_merge($errors, $iconValidation['errors']);
+                }
+            } 
+            // Handle base64 string
+            elseif (is_string($iconData) && !empty($iconData)) {
+                if (preg_match('/^data:image\/([a-zA-Z0-9+]+);base64,/', $iconData, $matches)) {
+                    $extension = $matches[1];
+                    $allowedTypes = ['jpeg', 'png', 'gif', 'webp', 'jpg'];
+                    if (!in_array(strtolower($extension), $allowedTypes)) {
+                        $errors[] = 'Invalid icon image type. Only JPG, PNG, GIF, WebP allowed';
+                    }
+                    
+                    // Extract data to check size
+                    $base64Data = substr($iconData, strpos($iconData, ',') + 1);
+                    $decodedImage = base64_decode($base64Data);
+                    if ($decodedImage === false) {
+                        $errors[] = 'Invalid base64 icon data';
+                    } elseif (strlen($decodedImage) > 2097152) { // 2MB
+                        $errors[] = 'Quiz icon must not exceed 2MB';
+                    }
+                } else {
+                    $errors[] = 'Invalid icon format. Expected base64 data URI or file upload';
+                }
             }
         }
 
@@ -77,6 +103,60 @@ class QuizService
             'message' => 'Quiz set validation failed',
             'errors' => $errors
         ];
+    }
+
+    /**
+     * Handle icon upload (multipart or base64)
+     * @param mixed $iconData Icon data
+     * @return string|null Relative path to icon or null
+     */
+    public function handleIconUpload($iconData): ?string
+    {
+        try {
+            if (empty($iconData)) {
+                return null;
+            }
+
+            $iconDir = ROOT_PATH . '/uploads/icons/';
+            if (!is_dir($iconDir)) {
+                mkdir($iconDir, 0755, true);
+            }
+
+            // Handle multipart upload
+            if (is_array($iconData) && isset($iconData['tmp_name'])) {
+                $extension = strtolower(pathinfo($iconData['name'], PATHINFO_EXTENSION));
+                $filename = 'icon_' . bin2hex(random_bytes(16)) . '.' . $extension;
+                $fullPath = $iconDir . $filename;
+
+                if (move_uploaded_file($iconData['tmp_name'], $fullPath)) {
+                    chmod($fullPath, 0644);
+                    return 'icons/' . $filename;
+                }
+            }
+            // Handle base64 string
+            elseif (is_string($iconData) && preg_match('/^data:image\/([a-zA-Z0-9+]+);base64,/', $iconData, $matches)) {
+                $extension = strtolower($matches[1]);
+                if ($extension === 'jpeg') $extension = 'jpg';
+                
+                $filename = 'icon_' . bin2hex(random_bytes(16)) . '.' . $extension;
+                $fullPath = $iconDir . $filename;
+
+                $base64Data = substr($iconData, strpos($iconData, ',') + 1);
+                $decodedImage = base64_decode($base64Data);
+
+                if (file_put_contents($fullPath, $decodedImage) !== false) {
+                    chmod($fullPath, 0644);
+                    return 'icons/' . $filename;
+                }
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            Logger::error('Error handling quiz icon upload', [
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
     }
 
     /**
@@ -663,8 +743,11 @@ class QuizService
             $sanitized['access_type'] = $data['access_type'];
         }
 
-        if (isset($data['icon']) && is_uploaded_file($data['icon'])) {
-            $sanitized['icon'] = $data['icon'];
+        if (isset($data['icon'])) {
+            $iconPath = $this->handleIconUpload($data['icon']);
+            if ($iconPath) {
+                $sanitized['icon_path'] = $iconPath;
+            }
         }
 
         return $sanitized;
