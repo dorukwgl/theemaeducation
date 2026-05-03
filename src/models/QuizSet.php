@@ -153,21 +153,11 @@ class QuizSet
                 return false;
             }
 
-            // Debug logging
-            Logger::log('QuizSet::create - Binding parameters', [
-                'query' => $query,
-                'types' => $types,
-                'params' => $params
-            ]);
-
             $stmt->bind_param($types, ...$params);
-
-            Logger::log('QuizSet::create - Executing query');
 
             if ($stmt->execute()) {
                 $quizSetId = $stmt->insert_id;
                 $stmt->close();
-                Logger::log('QuizSet::create - Success', ['quiz_set_id' => $quizSetId]);
                 return $quizSetId;
             } else {
                 Logger::error('QuizSet::create - Execute failed', [
@@ -888,11 +878,6 @@ class QuizSet
             $stmt->close();
 
             if ($result) {
-                Logger::log('Quiz set status updated', [
-                    'quiz_set_id' => $quizSetId,
-                    'old_status' => $quizSet['status'],
-                    'new_status' => $status
-                ]);
                 return true;
             }
 
@@ -951,11 +936,6 @@ class QuizSet
             $stmt->close();
 
             if ($result) {
-                Logger::log('Quiz set access type updated', [
-                    'quiz_set_id' => $quizSetId,
-                    'old_access_type' => $quizSet['access_type'],
-                    'new_access_type' => $accessType
-                ]);
                 return true;
             }
 
