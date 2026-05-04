@@ -47,7 +47,6 @@ class ImageProcessor
             $destinationImage = imagecreatetruecolor($originalWidth, $originalHeight);
 
             if (!$destinationImage) {
-                imagedestroy($sourceImage);
                 Logger::error('Failed to create destination image for compression', [
                     'width' => $originalWidth,
                     'height' => $originalHeight
@@ -70,9 +69,6 @@ class ImageProcessor
             );
 
             $result = self::saveImage($destinationImage, $destinationPath, $imageType, $quality);
-
-            imagedestroy($sourceImage);
-            imagedestroy($destinationImage);
 
             if (!$result) {
                 Logger::error('Failed to save compressed image', [
@@ -128,7 +124,6 @@ class ImageProcessor
             $destinationImage = imagecreatetruecolor($dimensions['width'], $dimensions['height']);
 
             if (!$destinationImage) {
-                imagedestroy($sourceImage);
                 Logger::error('Failed to create destination image', [
                     'dimensions' => $dimensions
                 ]);
@@ -152,9 +147,6 @@ class ImageProcessor
             );
 
             $result = self::saveImage($destinationImage, $destinationPath, $imageType, $quality);
-
-            imagedestroy($sourceImage);
-            imagedestroy($destinationImage);
 
             if (!$result) {
                 Logger::error('Failed to save processed image', [

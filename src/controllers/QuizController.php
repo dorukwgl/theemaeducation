@@ -4,6 +4,7 @@ namespace EMA\Controllers;
 
 use EMA\Models\QuizSet;
 use EMA\Models\Question;
+use EMA\Models\User;
 use EMA\Services\QuizService;
 use EMA\Utils\Logger;
 use EMA\Utils\Security;
@@ -326,14 +327,15 @@ class QuizController
             if ($page < 1) $page = 1;
             if ($perPage < 1 || $perPage > 100) $perPage = 20;
 
-            // Check if quiz set exists and user has access
+            // Check if quiz set exists
             $quizSet = QuizSet::findById($id);
             if (!$quizSet) {
                 $this->response->notFound('Quiz set not found');
                 return;
             }
 
-            if (!QuizSet::checkQuizSetAccess($userId, $id)) {
+            // Admins bypass all access restrictions; non-admins checked via published/draft/access_type
+            if (!User::isAdminById($userId) && !QuizSet::checkQuizSetAccess($userId, $id)) {
                 $this->response->forbidden('Access denied to quiz set');
                 return;
             }
