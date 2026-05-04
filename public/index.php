@@ -148,7 +148,7 @@ $router->put('/api/admin/quiz-sets/{id}/access-type', [QuizController::class, 'u
 
 // Admin question management routes
 $router->post('/api/quiz-sets/{id}/questions', [QuizController::class, 'createQuestion'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
-$router->put('/api/quiz-sets/{id}/questions/{question_id}', [QuizController::class, 'updateQuestion'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
+$router->post('/api/quiz-sets/{id}/questions/{question_id}', [QuizController::class, 'updateQuestion'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
 $router->delete('/api/quiz-sets/{id}/questions/{question_id}', [QuizController::class, 'deleteQuestion'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
 
 // Notice routes

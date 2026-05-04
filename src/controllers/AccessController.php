@@ -64,29 +64,15 @@ class AccessController
             $hasAccess = $this->accessService->checkAccess($userId, $itemId, $itemType);
 
             if ($hasAccess) {
-                Logger::info('Access check successful', [
-                    'user_id' => $userId,
-                    'item_id' => $itemId,
-                    'item_type' => $itemType,
-                    'ip' => Security::getRealIp()
-                ]);
-
-                $this->response->success('Access granted', [
+                $this->response->success([
                     'has_access' => true,
                     'message' => 'You have access to this item'
-                ]);
+                ], 'Access Granted');
             } else {
-                Logger::logSecurityEvent('Access check denied', [
-                    'user_id' => $userId,
-                    'item_id' => $itemId,
-                    'item_type' => $itemType,
-                    'ip' => Security::getRealIp()
-                ]);
-
-                $this->response->success('Access denied', [
+                $this->response->success([
                     'has_access' => false,
                     'message' => 'You do not have access to this item'
-                ]);
+                ], 'Access Denied');
             }
         } catch (\Exception $e) {
             Logger::error('Access check error', [
@@ -165,16 +151,7 @@ class AccessController
                 }
             }
 
-            Logger::info('Batch access check completed', [
-                'user_id' => $userId,
-                'item_type' => $itemType,
-                'total_items' => count($itemIds),
-                'accessible_count' => $accessibleCount,
-                'denied_count' => $deniedCount,
-                'ip' => Security::getRealIp()
-            ]);
-
-            $this->response->success('Batch access check completed', [
+            $this->response->success([
                 'results' => $results,
                 'summary' => [
                     'total_items' => count($itemIds),
@@ -182,7 +159,7 @@ class AccessController
                     'denied_count' => $deniedCount,
                     'accessibility_rate' => count($itemIds) > 0 ? round(($accessibleCount / count($itemIds)) * 100, 2) . '%' : '0%'
                 ]
-            ]);
+            ], 'Batch Access Check Completed');
         } catch (\Exception $e) {
             Logger::error('Batch access check error', [
                 'error' => $e->getMessage(),
@@ -228,7 +205,7 @@ class AccessController
             $result = $this->accessService->incrementAccessWithCheck($userId, $itemId, $itemType);
 
             if ($result['success']) {
-                $this->response->success('Access incremented successfully', $result);
+                $this->response->success($result, 'Access Incremented Successfully');
             } else {
                 $this->response->error($result['message'], 403, $result);
             }
@@ -252,10 +229,6 @@ class AccessController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized access grant attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can grant/revoke access', 403);
                 return;
             }
@@ -291,14 +264,6 @@ class AccessController
             if ($result['success']) {
                 $message = $action === 'grant' ? 'Access granted successfully' : 'Access revoked successfully';
 
-                Logger::logSecurityEvent('Access ' . $action . 'ed', [
-                    'admin_id' => $currentUser['id'],
-                    'target_user_id' => $userId,
-                    'item_id' => $itemId,
-                    'item_type' => $itemType,
-                    'ip' => Security::getRealIp()
-                ]);
-
                 $this->response->success($message, $result);
             } else {
                 $this->response->error($result['message'] ?? 'Operation failed', 400);
@@ -323,10 +288,6 @@ class AccessController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized permission list attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can list permissions', 403);
                 return;
             }
@@ -364,16 +325,10 @@ class AccessController
                 return;
             }
 
-            Logger::info('Permissions list accessed', [
-                'admin_id' => $currentUser['id'],
-                'user_id' => $userId,
-                'item_type' => $itemType
-            ]);
-
-            $this->response->success('Permissions retrieved successfully', [
+            $this->response->success([
                 'permissions' => $permissions,
                 'total' => count($permissions)
-            ]);
+            ], 'Permissions Retrieved Successfully');
         } catch (\Exception $e) {
             Logger::error('Permission list error', [
                 'error' => $e->getMessage(),
@@ -394,10 +349,6 @@ class AccessController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized public access attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can manage public access', 403);
                 return;
             }
@@ -425,19 +376,11 @@ class AccessController
 
             if ($result) {
                 $message = $grant ? 'Public access granted successfully' : 'Public access revoked successfully';
-
-                Logger::logSecurityEvent('Public access ' . ($grant ? 'granted' : 'revoked'), [
-                    'admin_id' => $currentUser['id'],
-                    'item_id' => $itemId,
-                    'item_type' => $itemType,
-                    'ip' => Security::getRealIp()
-                ]);
-
-                $this->response->success($message, [
+                $this->response->success([
                     'item_id' => $itemId,
                     'item_type' => $itemType,
                     'is_public' => $grant
-                ]);
+                ], $message);
             } else {
                 $this->response->error('Failed to update public access', 500);
             }
@@ -461,10 +404,6 @@ class AccessController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized public access list attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can list public access items', 403);
                 return;
             }
@@ -481,15 +420,10 @@ class AccessController
             // Get public access items
             $items = \EMA\Models\Access::getAllUsersAccess($itemType);
 
-            Logger::info('Public access list accessed', [
-                'admin_id' => $currentUser['id'],
-                'item_type' => $itemType
-            ]);
-
-            $this->response->success('Public access items retrieved successfully', [
+            $this->response->success([
                 'items' => $items,
                 'total' => count($items)
-            ]);
+            ], 'Public access items retrieved successfully');
         } catch (\Exception $e) {
             Logger::error('Public access list error', [
                 'error' => $e->getMessage(),
@@ -510,10 +444,6 @@ class AccessController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized logged-in access attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can manage logged-in access', 403);
                 return;
             }
@@ -542,18 +472,11 @@ class AccessController
             if ($result) {
                 $message = $grant ? 'Logged-in access granted successfully' : 'Logged-in access revoked successfully';
 
-                Logger::logSecurityEvent('Logged-in access ' . ($grant ? 'granted' : 'revoked'), [
-                    'admin_id' => $currentUser['id'],
-                    'item_id' => $itemId,
-                    'item_type' => $itemType,
-                    'ip' => Security::getRealIp()
-                ]);
-
-                $this->response->success($message, [
+                $this->response->success([
                     'item_id' => $itemId,
                     'item_type' => $itemType,
                     'is_logged_in_only' => $grant
-                ]);
+                ], $message);
             } else {
                 $this->response->error('Failed to update logged-in access', 500);
             }
@@ -577,10 +500,6 @@ class AccessController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized logged-in access list attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can list logged-in access items', 403);
                 return;
             }
@@ -597,15 +516,10 @@ class AccessController
             // Get logged-in access items
             $items = \EMA\Models\Access::getAllUsersAccess($itemType);
 
-            Logger::info('Logged-in access list accessed', [
-                'admin_id' => $currentUser['id'],
-                'item_type' => $itemType
-            ]);
-
-            $this->response->success('Logged-in access items retrieved successfully', [
+            $this->response->success([
                 'items' => $items,
                 'total' => count($items)
-            ]);
+            ], 'Logged-in access items retrieved successfully');
         } catch (\Exception $e) {
             Logger::error('Logged-in access list error', [
                 'error' => $e->getMessage(),
