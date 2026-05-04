@@ -584,6 +584,7 @@ CREATE TABLE IF NOT EXISTS `bulk_operations` (
   `operation_type` enum('bulk_delete','bulk_update','bulk_grant_access','bulk_revoke_access','bulk_publish','bulk_archive') NOT NULL,
   `target_type` enum('users','files','folders','quiz_sets','notices') NOT NULL,
   `target_ids` text NOT NULL,
+  `metadata` text DEFAULT NULL,
   `status` enum('pending','processing','completed','failed','cancelled') NOT NULL DEFAULT 'pending',
   `total_items` int DEFAULT 0,
   `processed_items` int DEFAULT 0,

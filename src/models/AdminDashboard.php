@@ -480,6 +480,11 @@ class AdminDashboard
                 $operation['target_ids'] = json_decode($operation['target_ids'], true);
             }
 
+            // Parse metadata JSON
+            if (isset($operation['metadata'])) {
+                $operation['metadata'] = json_decode($operation['metadata'], true);
+            }
+
             // Parse results JSON
             if (isset($operation['results'])) {
                 $operation['results'] = json_decode($operation['results'], true);

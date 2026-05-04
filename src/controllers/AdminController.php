@@ -185,7 +185,6 @@ class AdminController
         try {
             $currentUser = AuthMiddleware::getCurrentUser();
 
-            // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
                 $this->response->error('Only admins can create bulk operations', 403);
                 return;
@@ -193,9 +192,9 @@ class AdminController
 
             $data = $this->request->allInput();
 
-            // Validate input
+            // Base validation for all operation types
             $validation = Validator::make($data, [
-                'operation_type' => 'required|in:bulk_delete,bulk_update,bulk_grant_access,bulk_revoke_access,bulk_publish,bulk_archive',
+                'operation_type' => 'required|in:bulk_delete,bulk_grant_access,bulk_revoke_access,bulk_publish',
                 'target_type' => 'required|in:users,files,folders,quiz_sets,notices',
                 'target_ids' => 'required|array',
                 'target_ids.*' => 'integer'
@@ -211,12 +210,41 @@ class AdminController
             $targetIds = $data['target_ids'];
             $adminId = $currentUser['id'];
 
+            // Restrict target_type for access operations (only file/quiz_set make sense)
+            $accessOps = ['bulk_grant_access', 'bulk_revoke_access'];
+            if (in_array($operationType, $accessOps) && !in_array($targetType, ['files', 'quiz_sets'])) {
+                $this->response->validationError(
+                    ['target_type' => 'Target type must be "files" or "quiz_sets" for access operations'],
+                    'Validation failed'
+                );
+                return;
+            }
+
+            // Validate access-specific fields
+            $metadata = null;
+            if (in_array($operationType, $accessOps)) {
+                $accessValidation = Validator::make($data, [
+                    'user_id' => 'required|integer',
+                    'access_times' => 'nullable|integer|min:0'
+                ]);
+                if (!$accessValidation->validate()) {
+                    $this->response->validationError($accessValidation->getErrors(), 'Validation failed');
+                    return;
+                }
+
+                $metadata = [
+                    'user_id' => (int) $data['user_id'],
+                    'access_times' => isset($data['access_times']) ? (int) $data['access_times'] : 0
+                ];
+            }
+
             // Create bulk operation
             $operationId = $this->systemMonitoringService->createBulkOperation(
                 $adminId,
                 $operationType,
                 $targetType,
-                $targetIds
+                $targetIds,
+                $metadata
             );
 
             if ($operationId) {

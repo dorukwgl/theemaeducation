@@ -6,6 +6,7 @@ use EMA\Utils\Logger;
 use EMA\Utils\Security;
 use EMA\Models\User;
 use EMA\Models\AdminDashboard;
+use EMA\Models\Access;
 
 class SystemMonitoringService
 {
@@ -538,9 +539,10 @@ class SystemMonitoringService
      * @param string $operationType Type of bulk operation
      * @param string $targetType Type of target entities
      * @param array $targetIds Array of target entity IDs
+     * @param array|null $metadata Operation-specific metadata (e.g. user_id, access_times)
      * @return int|false Bulk operation ID or false on failure
      */
-    public function createBulkOperation(int $adminId, string $operationType, string $targetType, array $targetIds): int|false
+    public function createBulkOperation(int $adminId, string $operationType, string $targetType, array $targetIds, ?array $metadata = null): int|false
     {
         try {
             // Validate admin user
@@ -572,11 +574,12 @@ class SystemMonitoringService
             $limitedTargetIds = array_slice($targetIds, 0, 1000);
 
             // Create bulk operation record
-            $query = "INSERT INTO bulk_operations (admin_id, operation_type, target_type, target_ids, total_items, status) VALUES (?, ?, ?, ?, ?, 'pending')";
+            $query = "INSERT INTO bulk_operations (admin_id, operation_type, target_type, target_ids, metadata, total_items, status) VALUES (?, ?, ?, ?, ?, ?, 'pending')";
             $stmt = \EMA\Config\Database::prepare($query);
             $targetIdsJson = json_encode($limitedTargetIds);
+            $metadataJson = $metadata ? json_encode($metadata) : null;
             $totalItems = count($limitedTargetIds);
-            $stmt->bind_param('isssi', $adminId, $operationType, $targetType, $targetIdsJson, $totalItems);
+            $stmt->bind_param('issssi', $adminId, $operationType, $targetType, $targetIdsJson, $metadataJson, $totalItems);
 
             $result = $stmt->execute();
             $operationId = $stmt->insert_id;
@@ -589,6 +592,7 @@ class SystemMonitoringService
                     'operation_type' => $operationType,
                     'target_type' => $targetType,
                     'total_items' => $totalItems,
+                    'metadata' => $metadata,
                     'ip' => Security::getRealIp()
                 ]);
 
@@ -640,9 +644,11 @@ class SystemMonitoringService
             $failedItems = 0;
             $errors = [];
 
+            $metadata = $operation['metadata'] ?? null;
+
             foreach ($chunks as $chunk) {
                 foreach ($chunk as $targetId) {
-                    $result = $this->processBulkOperationItem($operation, $targetId);
+                    $result = $this->processBulkOperationItem($operation, $targetId, $metadata);
 
                     if ($result['success']) {
                         $processedItems++;
@@ -710,9 +716,10 @@ class SystemMonitoringService
      * Process single bulk operation item
      * @param array $operation Bulk operation details
      * @param int $targetId Target entity ID
+     * @param array|null $metadata Operation-specific metadata (for grant/revoke access)
      * @return array Processing result
      */
-    private function processBulkOperationItem(array $operation, int $targetId): array
+    private function processBulkOperationItem(array $operation, int $targetId, ?array $metadata = null): array
     {
         try {
             switch ($operation['operation_type']) {
@@ -721,9 +728,9 @@ class SystemMonitoringService
                 case 'bulk_update':
                     return $this->processBulkUpdate($operation['target_type'], $targetId);
                 case 'bulk_grant_access':
-                    return $this->processBulkGrantAccess($operation['target_type'], $targetId);
+                    return $this->processBulkGrantAccess($operation['target_type'], $targetId, $metadata);
                 case 'bulk_revoke_access':
-                    return $this->processBulkRevokeAccess($operation['target_type'], $targetId);
+                    return $this->processBulkRevokeAccess($operation['target_type'], $targetId, $metadata);
                 case 'bulk_publish':
                     return $this->processBulkPublish($operation['target_type'], $targetId);
                 case 'bulk_archive':
@@ -782,19 +789,26 @@ class SystemMonitoringService
 
     /**
      * Process bulk grant access
+     * Grants a specific user access to a target item
      * @param string $targetType Type of target entity
      * @param int $targetId Target entity ID
+     * @param array|null $metadata Must contain 'user_id', optionally 'access_times'
      * @return array Processing result
      */
-    private function processBulkGrantAccess(string $targetType, int $targetId): array
+    private function processBulkGrantAccess(string $targetType, int $targetId, ?array $metadata = null): array
     {
         try {
-            // Grant access to all users (simplified version)
-            $query = "INSERT INTO user_access (item_id, item_type, access_type, access_count) VALUES (?, ?, 'all', 0)";
-            $stmt = \EMA\Config\Database::prepare($query);
-            $stmt->bind_param('is', $targetId, $targetType);
-            $result = $stmt->execute();
-            $stmt->close();
+            if (!$metadata || !isset($metadata['user_id'])) {
+                return ['success' => false, 'error' => 'Missing user_id in metadata'];
+            }
+
+            $userId = (int) $metadata['user_id'];
+            $accessTimes = isset($metadata['access_times']) ? (int) $metadata['access_times'] : 0;
+
+            // Map target_type to item_type (files -> file, quiz_sets -> quiz_set)
+            $itemType = $targetType === 'quiz_sets' ? 'quiz_set' : 'file';
+
+            $result = Access::grantAccess($userId, $targetId, $itemType, $accessTimes);
 
             return [
                 'success' => $result,
@@ -807,18 +821,25 @@ class SystemMonitoringService
 
     /**
      * Process bulk revoke access
+     * Revokes a specific user's access from a target item
      * @param string $targetType Type of target entity
      * @param int $targetId Target entity ID
+     * @param array|null $metadata Must contain 'user_id'
      * @return array Processing result
      */
-    private function processBulkRevokeAccess(string $targetType, int $targetId): array
+    private function processBulkRevokeAccess(string $targetType, int $targetId, ?array $metadata = null): array
     {
         try {
-            $query = "DELETE FROM user_access WHERE item_id = ? AND item_type = ?";
-            $stmt = \EMA\Config\Database::prepare($query);
-            $stmt->bind_param('is', $targetId, $targetType);
-            $result = $stmt->execute();
-            $stmt->close();
+            if (!$metadata || !isset($metadata['user_id'])) {
+                return ['success' => false, 'error' => 'Missing user_id in metadata'];
+            }
+
+            $userId = (int) $metadata['user_id'];
+
+            // Map target_type to item_type (files -> file, quiz_sets -> quiz_set)
+            $itemType = $targetType === 'quiz_sets' ? 'quiz_set' : 'file';
+
+            $result = Access::revokeAccess($userId, $targetId, $itemType);
 
             return [
                 'success' => $result,

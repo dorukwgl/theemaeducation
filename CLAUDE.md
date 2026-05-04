@@ -92,5 +92,16 @@ composer migrate          # run migrations
 php -l path/to/file.php   # syntax check
 ```
 
-## Graphify
-Knowledge graph at `graphify-out/`. **Before answering codebase Qs**, read `graphify-out/GRAPH_REPORT.md` for god nodes & community structure. If `graphify-out/wiki/index.md` exists, use that instead of raw files. After modifying code, run `graphify update .` (AST-only, free).
+## Graphify (primary codebase interface)
+
+Knowledge graph at `graphify-out/`.
+
+### Read via graph first
+**Always use `graphify query "..."` to answer codebase questions before reading files directly.** The graph has 3,800+ nodes and 6,100+ edges covering the full application. Querying the graph is faster and cheaper than raw file reads, and surfaces cross-module relationships you'd miss reading files in isolation.
+
+Only read files directly (`Read` tool) when `graphify query` can't find what you need or you need exact line-level details.
+
+For quick orientation: read `graphify-out/GRAPH_REPORT.md` first (god nodes & community structure). If `graphify-out/wiki/index.md` exists, prefer it over raw files.
+
+### Update after every change
+**Run `graphify update .` after every change.** It's free (AST-only, no API cost) and keeps the graph current. This is not optional — always do it as the final step of any modification.
