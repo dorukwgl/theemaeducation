@@ -73,7 +73,7 @@ class AccessController
             if ($result['success']) {
                 $message = $action === 'grant' ? 'Access granted successfully' : 'Access revoked successfully';
 
-                $this->response->success($message, $result);
+                $this->response->success($result, $message);
             } else {
                 $this->response->error($result['message'] ?? 'Operation failed', 400);
             }

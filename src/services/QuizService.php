@@ -159,11 +159,7 @@ class QuizService
         }
     }
 
-    /**
-     * Validate question data
-     * @param array $data Question data
-     * @return array Validation result with success, errors, and data
-     */
+    
     public function validateQuestionData(array $data): array
     {
         $errors = [];
@@ -217,7 +213,7 @@ class QuizService
         }
 
         // Validate file uploads
-        if (isset($data['question_file']) && is_uploaded_file($data['question_file'])) {
+        if (isset($data['question_file']) && is_array($data['question_file']) && isset($data['question_file']['tmp_name'])) {
             $fileValidation = $this->validateQuestionFile($data['question_file']);
             if (!$fileValidation['valid']) {
                 $errors = array_merge($errors, $fileValidation['errors']);
@@ -226,7 +222,7 @@ class QuizService
 
         $choiceFileFields = ['choice_A_file', 'choice_B_file', 'choice_C_file', 'choice_D_file'];
         foreach ($choiceFileFields as $field) {
-            if (isset($data[$field]) && is_uploaded_file($data[$field])) {
+            if (isset($data[$field]) && is_array($data[$field]) && isset($data[$field]['tmp_name'])) {
                 $choice = strtoupper(explode('_', $field)[1]);
                 $fileValidation = $this->validateChoiceFile($data[$field], $choice);
                 if (!$fileValidation['valid']) {
@@ -646,10 +642,11 @@ class QuizService
         $allowedMimeTypes = [
             'image/jpeg', 'image/png', 'image/gif', 'image/webp',
             'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/aac',
-            'video/mp4', 'video/webm'
+            'video/mp4', 'video/webm',
+            'application/pdf'
         ];
         if (!in_array($uploadedFile['type'], $allowedMimeTypes)) {
-            $errors[] = 'Question file must be an image, audio, or video file';
+            $errors[] = 'Question file must be an image, audio, video, or PDF file';
         }
 
         return [
@@ -791,7 +788,7 @@ class QuizService
 
         $choiceFileFields = ['question_file', 'choice_A_file', 'choice_B_file', 'choice_C_file', 'choice_D_file'];
         foreach ($choiceFileFields as $field) {
-            if (isset($data[$field]) && is_uploaded_file($data[$field])) {
+            if (isset($data[$field]) && is_array($data[$field]) && isset($data[$field]['tmp_name'])) {
                 $sanitized[$field] = $data[$field];
             }
         }

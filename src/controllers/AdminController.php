@@ -194,7 +194,7 @@ class AdminController
 
             // Base validation for all operation types
             $validation = Validator::make($data, [
-                'operation_type' => 'required|in:bulk_delete,bulk_grant_access,bulk_revoke_access,bulk_publish',
+                'operation_type' => 'required|in:bulk_delete,bulk_grant_access,bulk_revoke_access,bulk_publish,bulk_archive',
                 'target_type' => 'required|in:users,files,folders,quiz_sets,notices',
                 'target_ids' => 'required|array',
                 'target_ids.*' => 'integer'

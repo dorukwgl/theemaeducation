@@ -29,6 +29,24 @@ class QuizController
     }
 
     /**
+     * Merge file uploads from $_FILES into the data array.
+     * Follows the same pattern used for icon uploads in store()/update().
+     *
+     * @param array $data Merged request data
+     * @return array Data array with file upload arrays merged in
+     */
+    private function mergeQuestionFileUploads(array $data): array
+    {
+        $fileFields = ['question_file', 'choice_A_file', 'choice_B_file', 'choice_C_file', 'choice_D_file'];
+        foreach ($fileFields as $field) {
+            if ($this->request->hasFile($field)) {
+                $data[$field] = $this->request->getFile($field);
+            }
+        }
+        return $data;
+    }
+
+    /**
      * List quiz sets
      * Endpoint: GET /api/quiz-sets
      * Middleware: AuthMiddleware (authenticated users)
@@ -161,12 +179,6 @@ class QuizController
     public function store(): void
     {
         try {
-            // Require admin role
-            if (!\EMA\Middleware\AuthMiddleware::isAdmin()) {
-                $this->response->forbidden('Admin access required');
-                return;
-            }
-
             $data = $this->request->allInput();
             
             // Include icon from files if present
@@ -213,12 +225,6 @@ class QuizController
     public function update(int $id): void
     {
         try {
-            // Require admin role
-            if (!\EMA\Middleware\AuthMiddleware::isAdmin()) {
-                $this->response->forbidden('Admin access required');
-                return;
-            }
-
             // Check if quiz set exists
             $quizSet = QuizSet::findById($id);
             if (!$quizSet) {
@@ -398,6 +404,7 @@ class QuizController
 
             $data = $this->request->allInput();
             $data['quiz_set_id'] = $id;
+            $data = $this->mergeQuestionFileUploads($data);
 
             // Validate input data
             $validation = $this->quizService->validateQuestionData($data);
@@ -458,6 +465,7 @@ class QuizController
             }
 
             $data = $this->request->allInput();
+            $data = $this->mergeQuestionFileUploads($data);
 
             // Validate CSRF token
             if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {

@@ -219,7 +219,7 @@ class Question
             $questionFile = null;
             $questionFileType = null;
             $questionFileMime = null;
-            if (isset($data['question_file']) && is_uploaded_file($data['question_file'])) {
+            if (isset($data['question_file']) && is_array($data['question_file']) && isset($data['question_file']['tmp_name'])) {
                 $questionUpload = self::handleQuestionFileUpload($data['question_file']);
                 if (!$questionUpload['success']) {
                     return false;
@@ -233,7 +233,7 @@ class Question
             $choiceAFile = null;
             $choiceAFileType = null;
             $choiceAFileMime = null;
-            if (isset($data['choice_A_file']) && is_uploaded_file($data['choice_A_file'])) {
+            if (isset($data['choice_A_file']) && is_array($data['choice_A_file']) && isset($data['choice_A_file']['tmp_name'])) {
                 $choiceAUpload = self::handleChoiceFileUpload($data['choice_A_file'], 'A');
                 if (!$choiceAUpload['success']) {
                     return false;
@@ -247,7 +247,7 @@ class Question
             $choiceBFile = null;
             $choiceBFileType = null;
             $choiceBFileMime = null;
-            if (isset($data['choice_B_file']) && is_uploaded_file($data['choice_B_file'])) {
+            if (isset($data['choice_B_file']) && is_array($data['choice_B_file']) && isset($data['choice_B_file']['tmp_name'])) {
                 $choiceBUpload = self::handleChoiceFileUpload($data['choice_B_file'], 'B');
                 if (!$choiceBUpload['success']) {
                     return false;
@@ -261,7 +261,7 @@ class Question
             $choiceCFile = null;
             $choiceCFileType = null;
             $choiceCFileMime = null;
-            if (isset($data['choice_C_file']) && is_uploaded_file($data['choice_C_file'])) {
+            if (isset($data['choice_C_file']) && is_array($data['choice_C_file']) && isset($data['choice_C_file']['tmp_name'])) {
                 $choiceCUpload = self::handleChoiceFileUpload($data['choice_C_file'], 'C');
                 if (!$choiceCUpload['success']) {
                     return false;
@@ -275,7 +275,7 @@ class Question
             $choiceDFile = null;
             $choiceDFileType = null;
             $choiceDFileMime = null;
-            if (isset($data['choice_D_file']) && is_uploaded_file($data['choice_D_file'])) {
+            if (isset($data['choice_D_file']) && is_array($data['choice_D_file']) && isset($data['choice_D_file']['tmp_name'])) {
                 $choiceDUpload = self::handleChoiceFileUpload($data['choice_D_file'], 'D');
                 if (!$choiceDUpload['success']) {
                     return false;
@@ -415,7 +415,7 @@ class Question
             }
 
             // Handle file replacements with cleanup
-            if (isset($data['question_file']) && is_uploaded_file($data['question_file'])) {
+            if (isset($data['question_file']) && is_array($data['question_file']) && isset($data['question_file']['tmp_name'])) {
                 $questionUpload = self::handleQuestionFileUpload($data['question_file']);
                 if (!$questionUpload['success']) {
                     return false;
@@ -440,7 +440,7 @@ class Question
                 $typeKey = 'choice_' . $choice . '_file_type';
                 $mimeKey = 'choice_' . $choice . '_file_mime';
 
-                if (isset($data[$fileKey]) && is_uploaded_file($data[$fileKey])) {
+                if (isset($data[$fileKey]) && is_array($data[$fileKey]) && isset($data[$fileKey]['tmp_name'])) {
                     $choiceUpload = self::handleChoiceFileUpload($data[$fileKey], $choice);
                     if (!$choiceUpload['success']) {
                         return false;
@@ -697,7 +697,8 @@ class Question
             $allowedMimeTypes = [
                 'image/jpeg', 'image/png', 'image/gif', 'image/webp',
                 'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/aac',
-                'video/mp4', 'video/webm'
+                'video/mp4', 'video/webm',
+                'application/pdf'
             ];
 
             if (!in_array($uploadedFile['type'], $allowedMimeTypes)) {
@@ -709,7 +710,7 @@ class Question
 
             // Validate file extension
             $extension = strtolower(pathinfo($uploadedFile['name'], PATHINFO_EXTENSION));
-            $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp3', 'wav', 'aac', 'mp4', 'webm'];
+            $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp3', 'wav', 'aac', 'mp4', 'webm', 'pdf'];
 
             if (!in_array($extension, $allowedExtensions)) {
                 Logger::warning('Question file upload failed: Invalid extension', [

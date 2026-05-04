@@ -209,7 +209,8 @@ class Response
         // return the first error message of first field
         if (is_array($errors)) {
             $firstField = array_key_first($errors);
-            return $errors[$firstField][0];
+            $err = $errors[$firstField];
+            return is_array($err) ? $err[0] : $err;
         }
         return $errors;
     }
