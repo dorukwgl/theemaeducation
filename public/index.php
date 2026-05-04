@@ -109,13 +109,7 @@ $router->post('/api/admin/health-check', [AdminController::class, 'runHealthChec
 $router->delete('/api/admin/audit-log', [AdminController::class, 'clearAuditLog'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
 
 // Access control routes
-$router->post('/api/access/batch-check', [AccessController::class, 'batchCheck'], [CsrfMiddleware::class]);
 $router->post('/api/access/grant', [AccessController::class, 'grant'], [AuthMiddleware::class, CsrfMiddleware::class]);
-$router->get('/api/access/permissions', [AccessController::class, 'permissions'], [AuthMiddleware::class]);
-$router->post('/api/access/all-users', [AccessController::class, 'grantAllUsers'], [AuthMiddleware::class, CsrfMiddleware::class]);
-$router->get('/api/access/all-users', [AccessController::class, 'allUsers'], [AuthMiddleware::class]);
-$router->post('/api/access/login-users', [AccessController::class, 'grantLoginUsers'], [AuthMiddleware::class, CsrfMiddleware::class]);
-$router->get('/api/access/login-users', [AccessController::class, 'loginUsers'], [AuthMiddleware::class]);
 
 // System routes
 $router->get('/api/notices', [SystemController::class, 'notices']);
