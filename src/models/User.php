@@ -341,10 +341,10 @@ class User
     public static function getAllAdmins(): array
     {
         try {
-            $sql = "SELECT au.*, u.full_name, u.email, u.phone, u.role, u.image, u.created_at, u.is_logged_in
-                     FROM admin_users au
-                     JOIN users u ON au.user_id = u.id
-                     ORDER BY au.assigned_at DESC";
+            $sql = "SELECT id, full_name, email, phone, image, role, created_at, is_logged_in
+                     FROM users
+                     WHERE role = 'admin'
+                     ORDER BY id DESC";
             $stmt = Database::prepare($sql);
             $stmt->execute();
             $result = $stmt->get_result();
@@ -380,19 +380,10 @@ class User
             // Start transaction
             Database::beginTransaction();
 
-            // Insert into admin_users
-            $stmt1 = Database::prepare(
-                "INSERT INTO admin_users (user_id, full_name, email, assigned_at) VALUES (?, ?, ?, NOW())"
-            );
-            $fullName = $user->getFullName();
-            $email = $user->getEmail();
-            $stmt1->bind_param('iss', $userId, $fullName, $email);
-            $stmt1->execute();
-
             // Update user role
-            $stmt2 = Database::prepare("UPDATE users SET role = 'admin' WHERE id = ?");
-            $stmt2->bind_param('i', $userId);
-            $stmt2->execute();
+            $stmt = Database::prepare("UPDATE users SET role = 'admin' WHERE id = ?");
+            $stmt->bind_param('i', $userId);
+            $stmt->execute();
 
             // Commit transaction
             Database::commit();
@@ -420,15 +411,10 @@ class User
             // Start transaction
             Database::beginTransaction();
 
-            // Delete from admin_users
-            $stmt1 = Database::prepare("DELETE FROM admin_users WHERE user_id = ?");
-            $stmt1->bind_param('i', $userId);
-            $stmt1->execute();
-
             // Update user role
-            $stmt2 = Database::prepare("UPDATE users SET role = 'user' WHERE id = ?");
-            $stmt2->bind_param('i', $userId);
-            $stmt2->execute();
+            $stmt = Database::prepare("UPDATE users SET role = 'user' WHERE id = ?");
+            $stmt->bind_param('i', $userId);
+            $stmt->execute();
 
             // Commit transaction
             Database::commit();
@@ -448,7 +434,7 @@ class User
     public static function isAdminById(int $userId): bool
     {
         try {
-            $stmt = Database::prepare("SELECT id FROM admin_users WHERE user_id = ? LIMIT 1");
+            $stmt = Database::prepare("SELECT id FROM users WHERE id = ? AND role = 'admin' LIMIT 1");
             $stmt->bind_param('i', $userId);
             $stmt->execute();
             $stmt->store_result();
@@ -513,26 +499,21 @@ class User
             // Start transaction
             Database::beginTransaction();
 
-            // Delete from admin_users first (foreign key dependency)
-            $stmt1 = Database::prepare("DELETE FROM admin_users WHERE user_id = ?");
-            $stmt1->bind_param('i', $userId);
+            // Delete from access_permissions
+            $stmt1 = Database::prepare("DELETE FROM access_permissions WHERE identifier = ?");
+            $identifier = 'user_' . $userId;
+            $stmt1->bind_param('s', $identifier);
             $stmt1->execute();
 
-            // Delete from access_permissions
-            $stmt2 = Database::prepare("DELETE FROM access_permissions WHERE identifier = ?");
-            $identifier = 'user_' . $userId;
-            $stmt2->bind_param('s', $identifier);
+            // Delete from password_reset_requests
+            $stmt2 = Database::prepare("DELETE FROM password_reset_requests WHERE user_id = ?");
+            $stmt2->bind_param('i', $userId);
             $stmt2->execute();
 
-            // Delete from password_reset_requests
-            $stmt3 = Database::prepare("DELETE FROM password_reset_requests WHERE user_id = ?");
-            $stmt3->bind_param('i', $userId);
-            $stmt3->execute();
-
             // Delete from users table
-            $stmt4 = Database::prepare("DELETE FROM users WHERE id = ?");
-            $stmt4->bind_param('i', $userId);
-            $result = $stmt4->execute();
+            $stmt3 = Database::prepare("DELETE FROM users WHERE id = ?");
+            $stmt3->bind_param('i', $userId);
+            $result = $stmt3->execute();
 
             // Commit transaction
             Database::commit();

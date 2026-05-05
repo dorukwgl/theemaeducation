@@ -4,6 +4,7 @@ namespace EMA\Controllers;
 
 use EMA\Models\File;
 use EMA\Models\Folder;
+use EMA\Models\User;
 use EMA\Utils\Validator;
 use EMA\Utils\Logger;
 use EMA\Core\Request;
@@ -1134,6 +1135,100 @@ class FileController
                 'trace' => $e->getTraceAsString()
             ]);
             $this->response->error('Failed to update file access type', 500);
+        }
+    }
+
+    /**
+     * Get files granted to a specific user (admin use)
+     * GET /api/admin/users/{userId}/files/granted
+     */
+    public function userGrantedFiles(int $userId): void
+    {
+        try {
+            $user = User::findById($userId);
+            if (!$user) {
+                $this->response->error('User not found', 404);
+                return;
+            }
+
+            $page = (int) ($this->request->getQueryParameter('page', 1));
+            $perPage = (int) ($this->request->getQueryParameter('per_page', 20));
+
+            $validation = Validator::make([
+                'page' => $page,
+                'per_page' => $perPage
+            ], [
+                'page' => 'integer|min:1',
+                'per_page' => 'integer|between:1,100'
+            ]);
+
+            if (!$validation->validate()) {
+                $this->response->validationError($validation->getErrors(), 'Invalid query parameters');
+                return;
+            }
+
+            $folderId = $this->request->getQueryParameter('folder_id');
+            $search = $this->request->getQueryParameter('search');
+
+            if ($folderId !== null) {
+                $folderId = (int) $folderId;
+            }
+
+            $result = File::getGrantedFilesForUser($userId, $page, $perPage, $folderId, $search);
+            $this->response->success($result, 'Granted files retrieved successfully');
+        } catch (\Exception $e) {
+            Logger::error('Error retrieving granted files for user', [
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            $this->response->error('Failed to retrieve granted files', 500);
+        }
+    }
+
+    /**
+     * Get files NOT granted to a specific user (admin use)
+     * GET /api/admin/users/{userId}/files/not-granted
+     */
+    public function userNotGrantedFiles(int $userId): void
+    {
+        try {
+            $user = User::findById($userId);
+            if (!$user) {
+                $this->response->error('User not found', 404);
+                return;
+            }
+
+            $page = (int) ($this->request->getQueryParameter('page', 1));
+            $perPage = (int) ($this->request->getQueryParameter('per_page', 20));
+
+            $validation = Validator::make([
+                'page' => $page,
+                'per_page' => $perPage
+            ], [
+                'page' => 'integer|min:1',
+                'per_page' => 'integer|between:1,100'
+            ]);
+
+            if (!$validation->validate()) {
+                $this->response->validationError($validation->getErrors(), 'Invalid query parameters');
+                return;
+            }
+
+            $folderId = $this->request->getQueryParameter('folder_id');
+            $search = $this->request->getQueryParameter('search');
+
+            if ($folderId !== null) {
+                $folderId = (int) $folderId;
+            }
+
+            $result = File::getNotGrantedFilesForUser($userId, $page, $perPage, $folderId, $search);
+            $this->response->success($result, 'Not-granted files retrieved successfully');
+        } catch (\Exception $e) {
+            Logger::error('Error retrieving not-granted files for user', [
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            $this->response->error('Failed to retrieve not-granted files', 500);
         }
     }
 }

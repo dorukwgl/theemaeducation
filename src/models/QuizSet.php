@@ -409,6 +409,7 @@ class QuizSet
                 SELECT q.id, q.quiz_set_id, q.question, q.optional_text,
                        q.correct_answer, q.question_type, q.question_word_formatting,
                        q.optional_word_formatting,
+                       q.question_file, q.question_file_type, q.question_file_mime,
                        choice_A_text, choice_A_file, choice_A_file_type, choice_A_file_mime,
                        choice_B_text, choice_B_file, choice_B_file_type, choice_B_file_mime,
                        choice_C_text, choice_C_file, choice_C_file_type, choice_C_file_mime,
@@ -434,6 +435,9 @@ class QuizSet
                     'question_type' => $row['question_type'],
                     'question_word_formatting' => json_decode($row['question_word_formatting'], true),
                     'optional_word_formatting' => json_decode($row['optional_word_formatting'], true),
+                    'question_file' => $row['question_file'],
+                    'question_file_type' => $row['question_file_type'],
+                    'question_file_mime' => $row['question_file_mime'],
                     'choice_A' => [
                         'text' => $row['choice_A_text'],
                         'file' => $row['choice_A_file'],
@@ -1384,6 +1388,277 @@ class QuizSet
                 'folder_id' => $folderId,
                 'access_type' => $accessType,
                 'status' => $status,
+                'error' => $e->getMessage()
+            ]);
+            return [
+                'quiz_sets' => [],
+                'pagination' => \EMA\Utils\Pagination::getMetadata($page, $perPage, 0),
+                'total' => 0
+            ];
+        }
+    }
+
+    /**
+     * Get quiz sets granted to a specific user via access_permissions (admin use)
+     * @param int $userId User ID to check grants for
+     * @param int $page Page number
+     * @param int $perPage Items per page
+     * @param int|null $folderId Optional folder filter
+     * @param string|null $search Optional search term
+     * @return array Paginated quiz sets with permission metadata
+     */
+    public static function getGrantedQuizSetsForUser(int $userId, int $page, int $perPage, ?int $folderId = null, ?string $search = null): array
+    {
+        try {
+            $identifier = 'user_' . $userId;
+
+            $query = "
+                SELECT qs.id, qs.folder_id, qs.name, qs.description, qs.icon_path,
+                       qs.access_type, qs.status, qs.question_count, qs.total_questions,
+                       qs.duration_minutes, qs.passing_score, qs.is_published,
+                       qs.created_by, qs.created_at, qs.updated_at,
+                       fl.name as folder_name, fl.icon_path as folder_icon_path,
+                       ap.access_times, ap.times_accessed, ap.is_active as grant_active, ap.granted_at
+                FROM quiz_sets qs
+                LEFT JOIN folders fl ON qs.folder_id = fl.id
+                INNER JOIN access_permissions ap ON ap.item_id = qs.id
+                    AND ap.item_type = 'quiz_set'
+                    AND ap.identifier = ?
+                WHERE 1=1
+            ";
+
+            $countQuery = "
+                SELECT COUNT(qs.id) as total
+                FROM quiz_sets qs
+                INNER JOIN access_permissions ap ON ap.item_id = qs.id
+                    AND ap.item_type = 'quiz_set'
+                    AND ap.identifier = ?
+                WHERE 1=1
+            ";
+
+            $params = [$identifier];
+            $types = 's';
+            $countParams = [$identifier];
+            $countTypes = 's';
+
+            if ($folderId !== null) {
+                $query .= " AND qs.folder_id = ?";
+                $countQuery .= " AND qs.folder_id = ?";
+                $params[] = $folderId;
+                $countParams[] = $folderId;
+                $types .= 'i';
+                $countTypes .= 'i';
+            }
+
+            if ($search !== null) {
+                $query .= " AND qs.name LIKE ?";
+                $countQuery .= " AND qs.name LIKE ?";
+                $searchParam = "%{$search}%";
+                $params[] = $searchParam;
+                $countParams[] = $searchParam;
+                $types .= 's';
+                $countTypes .= 's';
+            }
+
+            $query .= " ORDER BY qs.created_at DESC LIMIT ? OFFSET ?";
+
+            $offset = \EMA\Utils\Pagination::getOffset($page, $perPage);
+            $params[] = $perPage;
+            $params[] = $offset;
+            $types .= 'ii';
+
+            $stmt = \EMA\Config\Database::prepare($query);
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            $quizSets = [];
+            while ($row = $result->fetch_assoc()) {
+                $quizSetData = [
+                    'id' => (int) $row['id'],
+                    'folder_id' => (int) $row['folder_id'],
+                    'name' => $row['name'],
+                    'description' => $row['description'],
+                    'icon_path' => $row['icon_path'],
+                    'access_type' => $row['access_type'],
+                    'status' => $row['status'],
+                    'question_count' => (int) $row['question_count'],
+                    'total_questions' => (int) $row['total_questions'],
+                    'duration_minutes' => (int) $row['duration_minutes'],
+                    'passing_score' => (int) $row['passing_score'],
+                    'is_published' => (bool) $row['is_published'],
+                    'created_by' => $row['created_by'],
+                    'created_at' => $row['created_at'],
+                    'updated_at' => $row['updated_at'],
+                    'folder_name' => $row['folder_name'],
+                    'folder_icon_path' => $row['folder_icon_path'],
+                    'grant_info' => [
+                        'access_times' => (int) $row['access_times'],
+                        'times_accessed' => (int) $row['times_accessed'],
+                        'is_active' => (bool) $row['grant_active'],
+                        'granted_at' => $row['granted_at']
+                    ]
+                ];
+                $quizSets[] = $quizSetData;
+            }
+
+            $stmt->close();
+
+            $finalCountParams = array_slice($params, 0, -2);
+            $finalCountTypes = substr($types, 0, -2);
+
+            $countStmt = \EMA\Config\Database::prepare($countQuery);
+            $countStmt->bind_param($finalCountTypes, ...$finalCountParams);
+            $countStmt->execute();
+            $total = $countStmt->get_result()->fetch_assoc()['total'];
+            $countStmt->close();
+
+            $pagination = \EMA\Utils\Pagination::getMetadata($page, $perPage, $total);
+
+            return [
+                'quiz_sets' => $quizSets,
+                'pagination' => $pagination,
+                'total' => $total
+            ];
+        } catch (\Exception $e) {
+            Logger::error('Error getting granted quiz sets for user', [
+                'user_id' => $userId,
+                'page' => $page,
+                'per_page' => $perPage,
+                'folder_id' => $folderId,
+                'search' => $search,
+                'error' => $e->getMessage()
+            ]);
+            return [
+                'quiz_sets' => [],
+                'pagination' => \EMA\Utils\Pagination::getMetadata($page, $perPage, 0),
+                'total' => 0
+            ];
+        }
+    }
+
+    /**
+     * Get quiz sets NOT granted to a specific user via access_permissions (admin use)
+     * @param int $userId User ID to check grants for
+     * @param int $page Page number
+     * @param int $perPage Items per page
+     * @param int|null $folderId Optional folder filter
+     * @param string|null $search Optional search term
+     * @return array Paginated quiz sets without permission records
+     */
+    public static function getNotGrantedQuizSetsForUser(int $userId, int $page, int $perPage, ?int $folderId = null, ?string $search = null): array
+    {
+        try {
+            $identifier = 'user_' . $userId;
+
+            $query = "
+                SELECT qs.id, qs.folder_id, qs.name, qs.description, qs.icon_path,
+                       qs.access_type, qs.status, qs.question_count, qs.total_questions,
+                       qs.duration_minutes, qs.passing_score, qs.is_published,
+                       qs.created_by, qs.created_at, qs.updated_at,
+                       fl.name as folder_name, fl.icon_path as folder_icon_path
+                FROM quiz_sets qs
+                LEFT JOIN folders fl ON qs.folder_id = fl.id
+                LEFT JOIN access_permissions ap ON ap.item_id = qs.id
+                    AND ap.item_type = 'quiz_set'
+                    AND ap.identifier = ?
+                WHERE ap.id IS NULL
+            ";
+
+            $countQuery = "
+                SELECT COUNT(qs.id) as total
+                FROM quiz_sets qs
+                LEFT JOIN access_permissions ap ON ap.item_id = qs.id
+                    AND ap.item_type = 'quiz_set'
+                    AND ap.identifier = ?
+                WHERE ap.id IS NULL
+            ";
+
+            $params = [$identifier];
+            $types = 's';
+            $countParams = [$identifier];
+            $countTypes = 's';
+
+            if ($folderId !== null) {
+                $query .= " AND qs.folder_id = ?";
+                $countQuery .= " AND qs.folder_id = ?";
+                $params[] = $folderId;
+                $countParams[] = $folderId;
+                $types .= 'i';
+                $countTypes .= 'i';
+            }
+
+            if ($search !== null) {
+                $query .= " AND qs.name LIKE ?";
+                $countQuery .= " AND qs.name LIKE ?";
+                $searchParam = "%{$search}%";
+                $params[] = $searchParam;
+                $countParams[] = $searchParam;
+                $types .= 's';
+                $countTypes .= 's';
+            }
+
+            $query .= " ORDER BY qs.created_at DESC LIMIT ? OFFSET ?";
+
+            $offset = \EMA\Utils\Pagination::getOffset($page, $perPage);
+            $params[] = $perPage;
+            $params[] = $offset;
+            $types .= 'ii';
+
+            $stmt = \EMA\Config\Database::prepare($query);
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            $quizSets = [];
+            while ($row = $result->fetch_assoc()) {
+                $quizSetData = [
+                    'id' => (int) $row['id'],
+                    'folder_id' => (int) $row['folder_id'],
+                    'name' => $row['name'],
+                    'description' => $row['description'],
+                    'icon_path' => $row['icon_path'],
+                    'access_type' => $row['access_type'],
+                    'status' => $row['status'],
+                    'question_count' => (int) $row['question_count'],
+                    'total_questions' => (int) $row['total_questions'],
+                    'duration_minutes' => (int) $row['duration_minutes'],
+                    'passing_score' => (int) $row['passing_score'],
+                    'is_published' => (bool) $row['is_published'],
+                    'created_by' => $row['created_by'],
+                    'created_at' => $row['created_at'],
+                    'updated_at' => $row['updated_at'],
+                    'folder_name' => $row['folder_name'],
+                    'folder_icon_path' => $row['folder_icon_path']
+                ];
+                $quizSets[] = $quizSetData;
+            }
+
+            $stmt->close();
+
+            $finalCountParams = array_slice($params, 0, -2);
+            $finalCountTypes = substr($types, 0, -2);
+
+            $countStmt = \EMA\Config\Database::prepare($countQuery);
+            $countStmt->bind_param($finalCountTypes, ...$finalCountParams);
+            $countStmt->execute();
+            $total = $countStmt->get_result()->fetch_assoc()['total'];
+            $countStmt->close();
+
+            $pagination = \EMA\Utils\Pagination::getMetadata($page, $perPage, $total);
+
+            return [
+                'quiz_sets' => $quizSets,
+                'pagination' => $pagination,
+                'total' => $total
+            ];
+        } catch (\Exception $e) {
+            Logger::error('Error getting not-granted quiz sets for user', [
+                'user_id' => $userId,
+                'page' => $page,
+                'per_page' => $perPage,
+                'folder_id' => $folderId,
+                'search' => $search,
                 'error' => $e->getMessage()
             ]);
             return [

@@ -8,6 +8,7 @@ use EMA\Models\User;
 use EMA\Services\QuizService;
 use EMA\Utils\Logger;
 use EMA\Utils\Security;
+use EMA\Utils\Validator;
 use EMA\Core\Request;
 use EMA\Core\Response;
 
@@ -333,7 +334,6 @@ class QuizController
                 $this->response->notFound('Quiz set not found');
                 return;
             }
-
             // Admins bypass all access restrictions; non-admins checked via published/draft/access_type
             if (!User::isAdminById($userId) && !QuizSet::checkQuizSetAccess($userId, $id)) {
                 $this->response->forbidden('Access denied to quiz set');
@@ -351,14 +351,17 @@ class QuizController
             // Filter file URLs based on parameter
             if (!$includeFiles) {
                 foreach ($questions as &$question) {
-                    foreach (['question_file', 'choice_A_file', 'choice_B_file', 'choice_C_file', 'choice_D_file'] as $field) {
-                        if (isset($question[$field])) {
-                            $question[$field] = null;
-                        }
+                    $question['question_file'] = null;
+                    $question['question_file_type'] = null;
+                    $question['question_file_mime'] = null;
+                    foreach (['choice_A_file', 'choice_B_file', 'choice_C_file', 'choice_D_file'] as $field) {
+                        $question[$field] = null;
                     }
                     foreach (['A', 'B', 'C', 'D'] as $choice) {
                         if (isset($question['choice_' . $choice]['file'])) {
                             $question['choice_' . $choice]['file'] = null;
+                            $question['choice_' . $choice]['file_type'] = null;
+                            $question['choice_' . $choice]['file_mime'] = null;
                         }
                     }
                 }
@@ -1005,14 +1008,17 @@ class QuizController
             // Filter file URLs based on parameter
             if (!$includeFiles) {
                 foreach ($questions as &$question) {
-                    foreach (['question_file', 'choice_A_file', 'choice_B_file', 'choice_C_file', 'choice_D_file'] as $field) {
-                        if (isset($question[$field])) {
-                            $question[$field] = null;
-                        }
+                    $question['question_file'] = null;
+                    $question['question_file_type'] = null;
+                    $question['question_file_mime'] = null;
+                    foreach (['choice_A_file', 'choice_B_file', 'choice_C_file', 'choice_D_file'] as $field) {
+                        $question[$field] = null;
                     }
                     foreach (['A', 'B', 'C', 'D'] as $choice) {
                         if (isset($question['choice_' . $choice]['file'])) {
                             $question['choice_' . $choice]['file'] = null;
+                            $question['choice_' . $choice]['file_type'] = null;
+                            $question['choice_' . $choice]['file_mime'] = null;
                         }
                     }
                 }
@@ -1201,12 +1207,6 @@ class QuizController
 
             if ($result) {
                 $updatedQuizSet = QuizSet::findById($id);
-                Logger::log('Quiz set access type updated', [
-                    'quiz_set_id' => $id,
-                    'old_access_type' => $quizSet['access_type'],
-                    'new_access_type' => $newAccessType,
-                    'updated_by' => $currentUser['id']
-                ]);
                 $this->response->success($updatedQuizSet, 'Quiz set access type updated successfully');
             } else {
                 $this->response->error('Failed to update quiz set access type', 500);
@@ -1219,6 +1219,100 @@ class QuizController
             ]);
 
             $this->response->error('Failed to update quiz set access type', 500, ['Internal server error']);
+        }
+    }
+
+    /**
+     * Get quiz sets granted to a specific user (admin use)
+     * GET /api/admin/users/{userId}/quiz-sets/granted
+     */
+    public function userGrantedQuizSets(int $userId): void
+    {
+        try {
+            $user = User::findById($userId);
+            if (!$user) {
+                $this->response->notFound('User not found');
+                return;
+            }
+
+            $page = (int) ($this->request->getQueryParameter('page', 1));
+            $perPage = (int) ($this->request->getQueryParameter('per_page', 20));
+
+            $validation = Validator::make([
+                'page' => $page,
+                'per_page' => $perPage
+            ], [
+                'page' => 'integer|min:1',
+                'per_page' => 'integer|between:1,100'
+            ]);
+
+            if (!$validation->validate()) {
+                $this->response->badRequest('Invalid pagination parameters');
+                return;
+            }
+
+            $folderId = $this->request->getQueryParameter('folder_id');
+            $search = $this->request->getQueryParameter('search');
+
+            if ($folderId !== null) {
+                $folderId = (int) $folderId;
+            }
+
+            $result = QuizSet::getGrantedQuizSetsForUser($userId, $page, $perPage, $folderId, $search);
+            $this->response->success($result, 'Granted quiz sets retrieved successfully');
+        } catch (\Exception $e) {
+            Logger::error('Error retrieving granted quiz sets for user', [
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            $this->response->error('Failed to retrieve granted quiz sets', 500);
+        }
+    }
+
+    /**
+     * Get quiz sets NOT granted to a specific user (admin use)
+     * GET /api/admin/users/{userId}/quiz-sets/not-granted
+     */
+    public function userNotGrantedQuizSets(int $userId): void
+    {
+        try {
+            $user = User::findById($userId);
+            if (!$user) {
+                $this->response->notFound('User not found');
+                return;
+            }
+
+            $page = (int) ($this->request->getQueryParameter('page', 1));
+            $perPage = (int) ($this->request->getQueryParameter('per_page', 20));
+
+            $validation = Validator::make([
+                'page' => $page,
+                'per_page' => $perPage
+            ], [
+                'page' => 'integer|min:1',
+                'per_page' => 'integer|between:1,100'
+            ]);
+
+            if (!$validation->validate()) {
+                $this->response->badRequest('Invalid pagination parameters');
+                return;
+            }
+
+            $folderId = $this->request->getQueryParameter('folder_id');
+            $search = $this->request->getQueryParameter('search');
+
+            if ($folderId !== null) {
+                $folderId = (int) $folderId;
+            }
+
+            $result = QuizSet::getNotGrantedQuizSetsForUser($userId, $page, $perPage, $folderId, $search);
+            $this->response->success($result, 'Not-granted quiz sets retrieved successfully');
+        } catch (\Exception $e) {
+            Logger::error('Error retrieving not-granted quiz sets for user', [
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            $this->response->error('Failed to retrieve not-granted quiz sets', 500);
         }
     }
 }

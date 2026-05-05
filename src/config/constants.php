@@ -123,8 +123,7 @@ class Constants
 
     // Database Tables
     public const TABLE_USERS = 'users';
-    public const TABLE_ADMIN_USERS = 'admin_users';
-    public const TABLE_FOLDERS = 'folders';
+public const TABLE_FOLDERS = 'folders';
     public const TABLE_FILES = 'files';
     public const TABLE_QUIZ_SETS = 'quiz_sets';
     public const TABLE_QUESTIONS = 'questions';

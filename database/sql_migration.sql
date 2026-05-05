@@ -428,19 +428,6 @@ CREATE TABLE IF NOT EXISTS `password_reset_requests` (
     REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Admin Users Table
-CREATE TABLE IF NOT EXISTS `admin_users` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `user_id` int NOT NULL,
-  `full_name` varchar(255) NOT NULL,
-  `email` varchar(255) NOT NULL,
-  `assigned_at` datetime NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `idx_admin_users_user` (`user_id`),
-  KEY `idx_admin_users_assigned_at` (`assigned_at`),
-  CONSTRAINT `fk_admin_users_user` FOREIGN KEY (`user_id`)
-    REFERENCES `users`(`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Quiz Activity Table
 CREATE TABLE IF NOT EXISTS `quiz_activity` (

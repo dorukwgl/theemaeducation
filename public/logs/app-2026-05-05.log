@@ -1,0 +1,2 @@
+[2026-05-05T07:16:35.512634+00:00] stack.ERROR: PHP Error {"type":"Warning","message":"Undefined array key \"question_file\"","file":"/home/doruk/Enterprise/theemaeducation/src/models/Question.php","line":56} []
+[2026-05-05T07:18:09.921368+00:00] stack.ERROR: PHP Error {"type":"Warning","message":"Undefined array key \"question_file\"","file":"/home/doruk/Enterprise/theemaeducation/src/models/Question.php","line":56} []

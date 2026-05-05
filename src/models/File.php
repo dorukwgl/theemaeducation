@@ -1302,4 +1302,255 @@ class File
             ];
         }
     }
+
+    /**
+     * Get files granted to a specific user via access_permissions (admin use)
+     * @param int $userId User ID to check grants for
+     * @param int $page Page number
+     * @param int $perPage Items per page
+     * @param int|null $folderId Optional folder filter
+     * @param string|null $search Optional search term
+     * @return array Paginated files with permission metadata
+     */
+    public static function getGrantedFilesForUser(int $userId, int $page, int $perPage, ?int $folderId = null, ?string $search = null): array
+    {
+        try {
+            $identifier = 'user_' . $userId;
+
+            $query = "
+                SELECT f.id, f.name, f.file_path, f.icon_path, f.access_type, f.status, f.created_at,
+                       fl.name as folder_name, fl.icon_path as folder_icon_path,
+                       ap.access_times, ap.times_accessed, ap.is_active as grant_active, ap.granted_at
+                FROM files f
+                LEFT JOIN folders fl ON f.folder_id = fl.id
+                INNER JOIN access_permissions ap ON ap.item_id = f.id
+                    AND ap.item_type = 'file'
+                    AND ap.identifier = ?
+                WHERE 1=1
+            ";
+
+            $countQuery = "
+                SELECT COUNT(f.id) as total
+                FROM files f
+                INNER JOIN access_permissions ap ON ap.item_id = f.id
+                    AND ap.item_type = 'file'
+                    AND ap.identifier = ?
+                WHERE 1=1
+            ";
+
+            $params = [$identifier];
+            $types = 's';
+            $countParams = [$identifier];
+            $countTypes = 's';
+
+            if ($folderId !== null) {
+                $query .= " AND f.folder_id = ?";
+                $countQuery .= " AND f.folder_id = ?";
+                $params[] = $folderId;
+                $countParams[] = $folderId;
+                $types .= 'i';
+                $countTypes .= 'i';
+            }
+
+            if ($search !== null) {
+                $query .= " AND (f.name LIKE ? OR f.id LIKE ?)";
+                $countQuery .= " AND (f.name LIKE ? OR f.id LIKE ?)";
+                $searchParam = "%{$search}%";
+                $params[] = $searchParam;
+                $params[] = $searchParam;
+                $countParams[] = $searchParam;
+                $countParams[] = $searchParam;
+                $types .= 'ss';
+                $countTypes .= 'ss';
+            }
+
+            $query .= " ORDER BY f.id DESC LIMIT ? OFFSET ?";
+
+            $offset = \EMA\Utils\Pagination::getOffset($page, $perPage);
+            $params[] = $perPage;
+            $params[] = $offset;
+            $types .= 'ii';
+
+            $stmt = \EMA\Config\Database::prepare($query);
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            $files = [];
+            while ($row = $result->fetch_assoc()) {
+                $files[] = [
+                    'id' => (int) $row['id'],
+                    'name' => $row['name'],
+                    'file_path' => $row['file_path'],
+                    'icon_path' => $row['icon_path'],
+                    'access_type' => $row['access_type'],
+                    'status' => $row['status'],
+                    'created_at' => $row['created_at'],
+                    'folder_name' => $row['folder_name'],
+                    'folder_icon_path' => $row['folder_icon_path'],
+                    'grant_info' => [
+                        'access_times' => (int) $row['access_times'],
+                        'times_accessed' => (int) $row['times_accessed'],
+                        'is_active' => (bool) $row['grant_active'],
+                        'granted_at' => $row['granted_at']
+                    ]
+                ];
+            }
+
+            $stmt->close();
+
+            $finalCountParams = array_slice($params, 0, -2);
+            $finalCountTypes = substr($types, 0, -2);
+
+            $countStmt = \EMA\Config\Database::prepare($countQuery);
+            $countStmt->bind_param($finalCountTypes, ...$finalCountParams);
+            $countStmt->execute();
+            $total = (int) $countStmt->get_result()->fetch_assoc()['total'];
+            $countStmt->close();
+
+            $pagination = \EMA\Utils\Pagination::getMetadata($page, $perPage, $total);
+
+            return [
+                'files' => $files,
+                'pagination' => $pagination,
+                'total' => $total
+            ];
+        } catch (\Exception $e) {
+            Logger::error('Error getting granted files for user', [
+                'user_id' => $userId,
+                'page' => $page,
+                'per_page' => $perPage,
+                'folder_id' => $folderId,
+                'search' => $search,
+                'error' => $e->getMessage()
+            ]);
+            return [
+                'files' => [],
+                'pagination' => \EMA\Utils\Pagination::getMetadata($page, $perPage, 0),
+                'total' => 0
+            ];
+        }
+    }
+
+    /**
+     * Get files NOT granted to a specific user via access_permissions (admin use)
+     * @param int $userId User ID to check grants for
+     * @param int $page Page number
+     * @param int $perPage Items per page
+     * @param int|null $folderId Optional folder filter
+     * @param string|null $search Optional search term
+     * @return array Paginated files without permission records
+     */
+    public static function getNotGrantedFilesForUser(int $userId, int $page, int $perPage, ?int $folderId = null, ?string $search = null): array
+    {
+        try {
+            $identifier = 'user_' . $userId;
+
+            $query = "
+                SELECT f.id, f.name, f.file_path, f.icon_path, f.access_type, f.status, f.created_at,
+                       fl.name as folder_name, fl.icon_path as folder_icon_path
+                FROM files f
+                LEFT JOIN folders fl ON f.folder_id = fl.id
+                LEFT JOIN access_permissions ap ON ap.item_id = f.id
+                    AND ap.item_type = 'file'
+                    AND ap.identifier = ?
+                WHERE ap.id IS NULL
+            ";
+
+            $countQuery = "
+                SELECT COUNT(f.id) as total
+                FROM files f
+                LEFT JOIN access_permissions ap ON ap.item_id = f.id
+                    AND ap.item_type = 'file'
+                    AND ap.identifier = ?
+                WHERE ap.id IS NULL
+            ";
+
+            $params = [$identifier];
+            $types = 's';
+            $countParams = [$identifier];
+            $countTypes = 's';
+
+            if ($folderId !== null) {
+                $query .= " AND f.folder_id = ?";
+                $countQuery .= " AND f.folder_id = ?";
+                $params[] = $folderId;
+                $countParams[] = $folderId;
+                $types .= 'i';
+                $countTypes .= 'i';
+            }
+
+            if ($search !== null) {
+                $query .= " AND (f.name LIKE ? OR f.id LIKE ?)";
+                $countQuery .= " AND (f.name LIKE ? OR f.id LIKE ?)";
+                $searchParam = "%{$search}%";
+                $params[] = $searchParam;
+                $params[] = $searchParam;
+                $countParams[] = $searchParam;
+                $countParams[] = $searchParam;
+                $types .= 'ss';
+                $countTypes .= 'ss';
+            }
+
+            $query .= " ORDER BY f.id DESC LIMIT ? OFFSET ?";
+
+            $offset = \EMA\Utils\Pagination::getOffset($page, $perPage);
+            $params[] = $perPage;
+            $params[] = $offset;
+            $types .= 'ii';
+
+            $stmt = \EMA\Config\Database::prepare($query);
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            $files = [];
+            while ($row = $result->fetch_assoc()) {
+                $files[] = [
+                    'id' => (int) $row['id'],
+                    'name' => $row['name'],
+                    'file_path' => $row['file_path'],
+                    'icon_path' => $row['icon_path'],
+                    'access_type' => $row['access_type'],
+                    'status' => $row['status'],
+                    'created_at' => $row['created_at'],
+                    'folder_name' => $row['folder_name'],
+                    'folder_icon_path' => $row['folder_icon_path']
+                ];
+            }
+
+            $stmt->close();
+
+            $finalCountParams = array_slice($params, 0, -2);
+            $finalCountTypes = substr($types, 0, -2);
+
+            $countStmt = \EMA\Config\Database::prepare($countQuery);
+            $countStmt->bind_param($finalCountTypes, ...$finalCountParams);
+            $countStmt->execute();
+            $total = (int) $countStmt->get_result()->fetch_assoc()['total'];
+            $countStmt->close();
+
+            $pagination = \EMA\Utils\Pagination::getMetadata($page, $perPage, $total);
+
+            return [
+                'files' => $files,
+                'pagination' => $pagination,
+                'total' => $total
+            ];
+        } catch (\Exception $e) {
+            Logger::error('Error getting not-granted files for user', [
+                'user_id' => $userId,
+                'page' => $page,
+                'per_page' => $perPage,
+                'folder_id' => $folderId,
+                'search' => $search,
+                'error' => $e->getMessage()
+            ]);
+            return [
+                'files' => [],
+                'pagination' => \EMA\Utils\Pagination::getMetadata($page, $perPage, 0),
+                'total' => 0
+            ];
+        }
+    }
 }

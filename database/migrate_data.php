@@ -132,7 +132,7 @@ class DatabaseMigration {
 
         $tables = [
             'download_analytics', 'bulk_operations', 'audit_log', 'system_health', 'system_activity',
-            'quiz_results', 'quiz_attempts', 'quiz_activity', 'admin_users', 'password_reset_requests',
+            'quiz_results', 'quiz_attempts', 'quiz_activity', 'password_reset_requests',
             'notice_dismissals', 'notice_views', 'notice_attachments', 'system_notices',
             'item_activation_status', 'give_access_to_login_users', 'give_access_to_all_users',
             'access_to_all_users', 'user_access', 'access_permissions', 'questions_backup',
@@ -949,37 +949,18 @@ class DatabaseMigration {
 
         $count = 0;
         while ($row = $result->fetch_assoc()) {
-            // Check if the user_id exists in the new users table
-            $checkQuery = "SELECT id FROM users WHERE id = ?";
-            $checkStmt = $this->newConnection->prepare($checkQuery);
-            $checkStmt->bind_param('i', $row['user_id']);
-            $checkStmt->execute();
-            $checkResult = $checkStmt->get_result();
+            // Update user role to admin
+            $stmt = $this->newConnection->prepare(
+                "UPDATE users SET role = 'admin' WHERE id = ?"
+            );
+            $stmt->bind_param('i', $row['user_id']);
 
-            if ($checkResult->num_rows > 0) {
-                $stmt = $this->newConnection->prepare(
-                    "INSERT INTO admin_users (user_id, full_name, email, assigned_at)
-                     VALUES (?, ?, ?, ?)"
-                );
-
-                $stmt->bind_param(
-                    'ssss',
-                    $row['user_id'],
-                    $row['full_name'],
-                    $row['email'],
-                    $row['assigned_at']
-                );
-
-                if ($stmt->execute()) {
-                    $count++;
-                } else {
-                    $this->recordError('admin_users', "Failed to insert admin_user: " . $stmt->error);
-                }
-                $stmt->close();
+            if ($stmt->execute() && $stmt->affected_rows > 0) {
+                $count++;
             } else {
-                $this->recordError('admin_users', "User ID {$row['user_id']} not found in users table, skipping admin_user record");
+                $this->recordError('admin_users', "Failed to set admin role for user ID {$row['user_id']}: " . $stmt->error);
             }
-            $checkStmt->close();
+            $stmt->close();
         }
 
         $this->migratedCounts['admin_users'] = $count;

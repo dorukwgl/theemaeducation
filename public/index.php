@@ -108,6 +108,12 @@ $router->get('/api/admin/analytics', [AdminController::class, 'systemAnalytics']
 $router->post('/api/admin/health-check', [AdminController::class, 'runHealthCheck'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
 $router->delete('/api/admin/audit-log', [AdminController::class, 'clearAuditLog'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
 
+// Admin user grant inspection routes
+$router->get('/api/admin/users/{userId}/files/granted', [FileController::class, 'userGrantedFiles'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
+$router->get('/api/admin/users/{userId}/files/not-granted', [FileController::class, 'userNotGrantedFiles'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
+$router->get('/api/admin/users/{userId}/quiz-sets/granted', [QuizController::class, 'userGrantedQuizSets'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
+$router->get('/api/admin/users/{userId}/quiz-sets/not-granted', [QuizController::class, 'userNotGrantedQuizSets'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN])]);
+
 // Access control routes
 $router->post('/api/access/grant', [AccessController::class, 'grant'], [AuthMiddleware::class, CsrfMiddleware::class]);
 
