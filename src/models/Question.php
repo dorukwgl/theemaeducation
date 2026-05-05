@@ -22,6 +22,7 @@ class Question
                 SELECT q.id, q.quiz_set_id, q.question, q.optional_text,
                        q.correct_answer, q.question_type, q.question_word_formatting,
                        q.optional_word_formatting,
+                       q.question_file, q.question_file_type, q.question_file_mime,
                        choice_A_text, choice_A_file, choice_A_file_type, choice_A_file_mime,
                        choice_B_text, choice_B_file, choice_B_file_type, choice_B_file_mime,
                        choice_C_text, choice_C_file, choice_C_file_type, choice_C_file_mime,
@@ -195,12 +196,12 @@ class Question
     {
         try {
             // Validate required fields
-            if (!isset($data['quiz_set_id']) || !isset($data['question'])) {
+            if (!isset($data['quiz_set_id'])) {
                 return false;
             }
 
             $quizSetId = (int) $data['quiz_set_id'];
-            $question = trim($data['question']);
+            $question = isset($data['question']) ? trim($data['question']) : '';
             $optionalText = $data['optional_text'] ?? null;
             $correctAnswer = strtoupper($data['correct_answer']);
             $questionType = $data['question_type'] ?? 'reading';
@@ -685,13 +686,23 @@ class Question
         try {
             $result = ['success' => false, 'file_path' => null, 'file_type' => null, 'file_mime' => null];
 
-            // Validate file size (max 10MB)
-            $maxSize = 10485760; // 10MB
+            // Check for PHP upload errors
+            $uploadError = $uploadedFile['error'] ?? UPLOAD_ERR_NO_FILE;
+            if ($uploadError !== UPLOAD_ERR_OK) {
+                Logger::error('Question file upload error', [
+                    'error_code' => $uploadError,
+                    'name' => $uploadedFile['name'] ?? 'unknown'
+                ]);
+                return $result;
+            }
+
+            // Validate file size (max 15MB)
+            $maxSize = 15728640; // 15MB
             if ($uploadedFile['size'] > $maxSize) {
                 return $result;
             }
 
-            // Validate MIME type
+            // Validate MIME type (with extension fallback for non-standard browser types)
             $allowedMimeTypes = [
                 'image/jpeg', 'image/png', 'image/gif', 'image/webp',
                 'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/aac',
@@ -699,15 +710,11 @@ class Question
                 'application/pdf'
             ];
 
-            if (!in_array($uploadedFile['type'], $allowedMimeTypes)) {
-                return $result;
-            }
-
-            // Validate file extension
-            $extension = strtolower(pathinfo($uploadedFile['name'], PATHINFO_EXTENSION));
             $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp3', 'wav', 'aac', 'mp4', 'webm', 'pdf'];
-
-            if (!in_array($extension, $allowedExtensions)) {
+            $mimeOk = in_array($uploadedFile['type'], $allowedMimeTypes);
+            $extension = strtolower(pathinfo($uploadedFile['name'], PATHINFO_EXTENSION));
+            $extOk = in_array($extension, $allowedExtensions);
+            if (!$mimeOk && !$extOk) {
                 return $result;
             }
 
@@ -772,27 +779,36 @@ class Question
         try {
             $result = ['success' => false, 'file_path' => null, 'file_type' => null, 'file_mime' => null];
 
-            // Validate file size (max 5MB)
-            $maxSize = 5242880; // 5MB
+            // Check for PHP upload errors
+            $uploadError = $uploadedFile['error'] ?? UPLOAD_ERR_NO_FILE;
+            if ($uploadError !== UPLOAD_ERR_OK) {
+                Logger::error('Choice file upload error', [
+                    'choice' => $choice,
+                    'error_code' => $uploadError,
+                    'name' => $uploadedFile['name'] ?? 'unknown'
+                ]);
+                return $result;
+            }
+
+            // Validate file size (max 15MB)
+            $maxSize = 15728640; // 15MB
             if ($uploadedFile['size'] > $maxSize) {
                 return $result;
             }
 
-            // Validate MIME type (images and audio only for choices)
+            // Validate MIME type (with extension fallback for non-standard browser types)
             $allowedMimeTypes = [
                 'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-                'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/aac'
+                'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/aac',
+                'video/mp4', 'video/webm',
+                'application/pdf'
             ];
 
-            if (!in_array($uploadedFile['type'], $allowedMimeTypes)) {
-                return $result;
-            }
-
-            // Validate file extension
+            $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp3', 'wav', 'aac', 'mp4', 'webm', 'pdf'];
+            $mimeOk = in_array($uploadedFile['type'], $allowedMimeTypes);
             $extension = strtolower(pathinfo($uploadedFile['name'], PATHINFO_EXTENSION));
-            $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp3', 'wav', 'aac'];
-
-            if (!in_array($extension, $allowedExtensions)) {
+            $extOk = in_array($extension, $allowedExtensions);
+            if (!$mimeOk && !$extOk) {
                 return $result;
             }
 

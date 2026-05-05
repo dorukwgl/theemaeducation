@@ -322,7 +322,7 @@ class QuizController
             $userId = $currentUser['id'];
             $page = (int) ($this->request->getInput('page', 1));
             $perPage = (int) ($this->request->getInput('per_page', 20));
-            $includeFiles = $this->request->getInput('include_files') === 'true';
+            $includeFiles = $this->request->getInput('include_files') !== 'false';
 
             // Validate pagination parameters
             if ($page < 1) $page = 1;
@@ -348,7 +348,7 @@ class QuizController
             $offset = ($page - 1) * $perPage;
             $questions = array_slice($questions, $offset, $perPage);
 
-            // Filter file URLs based on parameter
+            // Filter file URLs based on parameter (include by default)
             if (!$includeFiles) {
                 foreach ($questions as &$question) {
                     $question['question_file'] = null;
@@ -411,6 +411,15 @@ class QuizController
             $data['quiz_set_id'] = $id;
             $data = $this->mergeQuestionFileUploads($data);
 
+            if ($this->request->wasInputDiscarded()) {
+                $contentLength = $this->request->getHeader('Content-Length', 'unknown');
+                $this->response->error(
+                    "Upload failed: request body ({$contentLength} bytes) exceeds upload limits. " .
+                    'Ask the server administrator to increase post_max_size and upload_max_filesize.',
+                    413
+                );
+                return;
+            }
             // Validate input data
             $validation = $this->quizService->validateQuestionData($data);
 
@@ -979,7 +988,7 @@ class QuizController
         try {
             $page = (int) ($this->request->getInput('page', 1));
             $perPage = (int) ($this->request->getInput('per_page', 20));
-            $includeFiles = $this->request->getInput('include_files') === 'true';
+            $includeFiles = $this->request->getInput('include_files') !== 'false';
 
             // Validate pagination parameters
             if ($page < 1) $page = 1;
@@ -1005,7 +1014,7 @@ class QuizController
             $offset = ($page - 1) * $perPage;
             $questions = array_slice($questions, $offset, $perPage);
 
-            // Filter file URLs based on parameter
+            // Filter file URLs based on parameter (include by default)
             if (!$includeFiles) {
                 foreach ($questions as &$question) {
                     $question['question_file'] = null;

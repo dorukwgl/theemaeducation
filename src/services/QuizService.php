@@ -169,9 +169,14 @@ class QuizService
             $errors[] = 'Valid quiz set ID is required';
         }
 
-        if (!isset($data['question']) || empty(trim($data['question']))) {
-            $errors[] = 'Question text is required';
-        } elseif (strlen(trim($data['question'])) > 5000) {
+        $hasQuestionText = isset($data['question']) && !empty(trim($data['question']));
+        $hasQuestionFile = isset($data['question_file']) && is_array($data['question_file']) && isset($data['question_file']['tmp_name']);
+
+        if (!$hasQuestionText && !$hasQuestionFile) {
+            $errors[] = 'Either question text or a question file is required';
+        }
+
+        if ($hasQuestionText && strlen(trim($data['question'])) > 5000) {
             $errors[] = 'Question text must not exceed 5000 characters';
         }
 
@@ -632,20 +637,33 @@ class QuizService
     {
         $errors = [];
 
-        // Validate file size (max 10MB)
-        $maxSize = 10485760; // 10MB
-        if ($uploadedFile['size'] > $maxSize) {
-            $errors[] = 'Question file must not exceed 10MB';
+        // Check for PHP upload errors
+        $uploadError = $uploadedFile['error'] ?? UPLOAD_ERR_NO_FILE;
+        if ($uploadError !== UPLOAD_ERR_OK) {
+            $errors[] = 'Question file upload failed (error code: ' . $uploadError . ')';
+            return [
+                'valid' => false,
+                'errors' => $errors
+            ];
         }
 
-        // Validate MIME type
+        // Validate file size (max 15MB)
+        $maxSize = 15728640; // 15MB
+        if ($uploadedFile['size'] > $maxSize) {
+            $errors[] = 'Question file must not exceed 15MB';
+        }
+
+        // Validate MIME type (with extension fallback for non-standard browser types)
         $allowedMimeTypes = [
             'image/jpeg', 'image/png', 'image/gif', 'image/webp',
             'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/aac',
             'video/mp4', 'video/webm',
             'application/pdf'
         ];
-        if (!in_array($uploadedFile['type'], $allowedMimeTypes)) {
+        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp3', 'wav', 'aac', 'mp4', 'webm', 'pdf'];
+        $mimeOk = in_array($uploadedFile['type'], $allowedMimeTypes);
+        $extOk = in_array(strtolower(pathinfo($uploadedFile['name'], PATHINFO_EXTENSION)), $allowedExtensions);
+        if (!$mimeOk && !$extOk) {
             $errors[] = 'Question file must be an image, audio, video, or PDF file';
         }
 
@@ -665,19 +683,34 @@ class QuizService
     {
         $errors = [];
 
-        // Validate file size (max 5MB)
-        $maxSize = 5242880; // 5MB
-        if ($uploadedFile['size'] > $maxSize) {
-            $errors[] = "Choice {$choice} file must not exceed 5MB";
+        // Check for PHP upload errors
+        $uploadError = $uploadedFile['error'] ?? UPLOAD_ERR_NO_FILE;
+        if ($uploadError !== UPLOAD_ERR_OK) {
+            $errors[] = "Choice {$choice} file upload failed (error code: {$uploadError})";
+            return [
+                'valid' => false,
+                'errors' => $errors
+            ];
         }
 
-        // Validate MIME type (images and audio only)
+        // Validate file size (max 15MB)
+        $maxSize = 15728640; // 15MB
+        if ($uploadedFile['size'] > $maxSize) {
+            $errors[] = "Choice {$choice} file must not exceed 15MB";
+        }
+
+        // Validate MIME type (with extension fallback for non-standard browser types)
         $allowedMimeTypes = [
             'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-            'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/aac'
+            'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/aac',
+            'video/mp4', 'video/webm',
+            'application/pdf'
         ];
-        if (!in_array($uploadedFile['type'], $allowedMimeTypes)) {
-            $errors[] = "Choice {$choice} file must be an image or audio file";
+        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp3', 'wav', 'aac', 'mp4', 'webm', 'pdf'];
+        $mimeOk = in_array($uploadedFile['type'], $allowedMimeTypes);
+        $extOk = in_array(strtolower(pathinfo($uploadedFile['name'], PATHINFO_EXTENSION)), $allowedExtensions);
+        if (!$mimeOk && !$extOk) {
+            $errors[] = "Choice {$choice} file type is not supported";
         }
 
         return [
@@ -759,9 +792,12 @@ class QuizService
     {
         $sanitized = [
             'quiz_set_id' => (int) $data['quiz_set_id'],
-            'question' => trim($data['question']),
             'correct_answer' => strtoupper($data['correct_answer'])
         ];
+
+        if (isset($data['question']) && !empty(trim($data['question']))) {
+            $sanitized['question'] = trim($data['question']);
+        }
 
         if (isset($data['optional_text'])) {
             $sanitized['optional_text'] = trim($data['optional_text']);

@@ -42,7 +42,32 @@ class Request
                 $headers[$header] = $value;
             }
         }
+        // Content-Type and Content-Length are CGI variables, not HTTP_ prefixed
+        if (isset($_SERVER['CONTENT_TYPE'])) {
+            $headers['Content-Type'] = $_SERVER['CONTENT_TYPE'];
+        }
+        if (isset($_SERVER['CONTENT_LENGTH'])) {
+            $headers['Content-Length'] = $_SERVER['CONTENT_LENGTH'];
+        }
         return $headers;
+    }
+
+    /**
+     * Check if the POST body was discarded by PHP (e.g. exceeded post_max_size).
+     * When PHP discards input, both $_POST and $_FILES are silently cleared.
+     */
+    public function wasInputDiscarded(): bool
+    {
+        // Only relevant for POST/PUT/PATCH requests with a request body
+        if (!in_array($this->method, ['POST', 'PUT', 'PATCH'])) {
+            return false;
+        }
+        $contentLength = (int) ($this->getHeader('Content-Length', 0));
+        if ($contentLength <= 0) {
+            return false;
+        }
+        // If there's content but no post data, no files, and no JSON body, it was discarded
+        return empty($this->post) && empty($this->files) && empty($this->json);
     }
 
     private function parseJson(): array
@@ -171,7 +196,16 @@ class Request
 
     public function allInput(): array
     {
-        return array_merge($this->query, $this->post, $this->json);
+        $data = array_merge($this->query, $this->post, $this->json);
+
+        // Include successfully uploaded files so multipart/form-data requests are fully captured
+        foreach ($this->files as $key => $file) {
+            if (is_array($file) && isset($file['error']) && $file['error'] === UPLOAD_ERR_OK) {
+                $data[$key] = $file;
+            }
+        }
+
+        return $data;
     }
 
     public function getFile(string $name): ?array
@@ -181,7 +215,7 @@ class Request
 
     public function hasFile(string $name): bool
     {
-        return isset($this->files[$name]) && $this->files[$name]['error'] !== UPLOAD_ERR_NO_FILE;
+        return isset($this->files[$name]) && $this->files[$name]['error'] === UPLOAD_ERR_OK;
     }
 
     public function allFiles(): array
