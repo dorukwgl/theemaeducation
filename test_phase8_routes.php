@@ -210,7 +210,7 @@ class Phase8RoutesTest
             'PUT /api/quiz-sets/{id}',
             'DELETE /api/quiz-sets/{id}',
             'PUT /api/admin/quiz-sets/{id}/status',
-            'PUT /api/admin/quiz-sets/{id}/access-type',
+            'POST /api/admin/quiz-sets/{id}/access-type',
             'POST /api/quiz-sets/{id}/questions',
             'PUT /api/quiz-sets/{id}/questions/{question_id}',
             'DELETE /api/quiz-sets/{id}/questions/{question_id}'
@@ -275,7 +275,7 @@ class Phase8RoutesTest
                 'PUT /api/admin/files/{id}/access-type',
                 'POST /api/quiz-sets',
                 'PUT /api/admin/quiz-sets/{id}/status',
-                'PUT /api/admin/quiz-sets/{id}/access-type'
+                'POST /api/admin/quiz-sets/{id}/access-type'
             ];
 
             $adminMiddlewarePresent = $this->checkRoutesHaveAdminMiddleware($adminRoutes);
@@ -395,7 +395,7 @@ class Phase8RoutesTest
             ['method' => 'PUT', 'path' => '/api/quiz-sets/{id}', 'middleware' => ['AuthMiddleware:admin', 'CsrfMiddleware']],
             ['method' => 'DELETE', 'path' => '/api/quiz-sets/{id}', 'middleware' => ['AuthMiddleware:admin', 'CsrfMiddleware']],
             ['method' => 'PUT', 'path' => '/api/admin/quiz-sets/{id}/status', 'middleware' => ['AuthMiddleware:admin', 'CsrfMiddleware']],
-            ['method' => 'PUT', 'path' => '/api/admin/quiz-sets/{id}/access-type', 'middleware' => ['AuthMiddleware:admin', 'CsrfMiddleware']],
+            ['method' => 'POST', 'path' => '/api/admin/quiz-sets/{id}/access-type', 'middleware' => ['AuthMiddleware:admin', 'CsrfMiddleware']],
             ['method' => 'POST', 'path' => '/api/quiz-sets/{id}/questions', 'middleware' => ['AuthMiddleware:admin', 'CsrfMiddleware']],
             ['method' => 'PUT', 'path' => '/api/quiz-sets/{id}/questions/{question_id}', 'middleware' => ['AuthMiddleware:admin', 'CsrfMiddleware']],
             ['method' => 'DELETE', 'path' => '/api/quiz-sets/{id}/questions/{question_id}', 'middleware' => ['AuthMiddleware:admin', 'CsrfMiddleware']],

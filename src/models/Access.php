@@ -73,19 +73,8 @@ class Access
     public static function grantAccess(int $userId, int $itemId, string $itemType, int $accessTimes = 0): bool
     {
         try {
-            Logger::log('Access::grantAccess called', [
-                'user_id' => $userId,
-                'item_id' => $itemId,
-                'item_type' => $itemType,
-                'access_times' => $accessTimes
-            ]);
-
             // Check if user exists
             $user = User::findById($userId);
-            Logger::log('Access::grantAccess - User check', [
-                'user_id' => $userId,
-                'user_found' => $user !== null
-            ]);
             if (!$user) {
                 Logger::error('Access::grantAccess - User not found', [
                     'user_id' => $userId
@@ -115,12 +104,6 @@ class Access
             $stmt->execute();
             $stmt->store_result();
 
-            Logger::log('Access::grantAccess - Item check', [
-                'item_id' => $itemId,
-                'item_type' => $itemType,
-                'item_found' => $stmt->num_rows > 0
-            ]);
-
             if (!$stmt->num_rows) {
                 Logger::error('Access::grantAccess - Item not found', [
                     'item_id' => $itemId,
@@ -140,13 +123,6 @@ class Access
             $stmt->execute();
             $stmt->store_result();
 
-            Logger::log('Access::grantAccess - Existing permission check', [
-                'identifier' => $identifier,
-                'item_id' => $itemId,
-                'item_type' => $itemType,
-                'existing_permission' => $stmt->num_rows > 0
-            ]);
-
             // Start transaction
             Database::beginTransaction();
 
@@ -158,12 +134,6 @@ class Access
                      WHERE identifier = ? AND item_id = ? AND item_type = ?"
                 );
                 $stmt->bind_param('isis', $accessTimes, $identifier, $itemId, $itemType);
-                Logger::log('Access::grantAccess - Updating existing permission', [
-                    'access_times' => $accessTimes,
-                    'identifier' => $identifier,
-                    'item_id' => $itemId,
-                    'item_type' => $itemType
-                ]);
             } else {
                 // Insert new permission
                 $stmt = Database::prepare(
@@ -172,34 +142,14 @@ class Access
                      VALUES (?, 0, ?, ?, ?, 0, 1)"
                 );
                 $stmt->bind_param('sisi', $identifier, $itemId, $itemType, $accessTimes);
-                Logger::log('Access::grantAccess - Inserting new permission', [
-                    'identifier' => $identifier,
-                    'item_id' => $itemId,
-                    'item_type' => $itemType,
-                    'access_times' => $accessTimes
-                ]);
             }
 
             $result = $stmt->execute();
-            Logger::log('Access::grantAccess - Statement execute result', [
-                'success' => $result !== false,
-                'error' => $stmt->error ?? 'no error'
-            ]);
-
+            
             // Commit transaction
-            $commitResult = Database::commit();
-            Logger::log('Access::grantAccess - Transaction commit', [
-                'success' => $commitResult
-            ]);
+            Database::commit();
 
-            if ($result) {
-                Logger::log('Access granted', [
-                    'user_id' => $userId,
-                    'item_id' => $itemId,
-                    'item_type' => $itemType,
-                    'access_times' => $accessTimes
-                ]);
-            } else {
+            if (!$result) {
                 Logger::error('Access::grantAccess - Statement execution failed', [
                     'error' => $stmt->error ?? 'unknown error',
                     'errno' => $stmt->errno ?? 0
@@ -237,14 +187,6 @@ class Access
             );
             $stmt->bind_param('sis', $identifier, $itemId, $itemType);
             $result = $stmt->execute();
-
-            if ($result && $stmt->affected_rows > 0) {
-                Logger::log('Access revoked', [
-                    'user_id' => $userId,
-                    'item_id' => $itemId,
-                    'item_type' => $itemType
-                ]);
-            }
 
             return $result;
         } catch (\Exception $e) {

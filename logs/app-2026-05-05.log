@@ -1,0 +1,1 @@
+[2026-05-05T13:37:10.772352+00:00] stack.ERROR: PHP Error {"type":"Warning","message":"session_name(): Session name cannot be changed after headers have already been sent","file":"/home/doruk/Enterprise/theemaeducation/src/core/App.php","line":120} []

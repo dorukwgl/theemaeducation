@@ -527,31 +527,6 @@ class Question
                 return false;
             }
 
-            // Backup question to questions_backup table
-            $backupQuery = "
-                INSERT INTO questions_backup (
-                    quiz_set_id, question, optional_text,
-                    correct_answer, question_type, question_word_formatting, optional_word_formatting,
-                    question_file, question_file_type, question_file_mime,
-                    choice_A_text, choice_A_file, choice_A_file_type, choice_A_file_mime,
-                    choice_B_text, choice_B_file, choice_B_file_type, choice_B_file_mime,
-                    choice_C_text, choice_C_file, choice_C_file_type, choice_C_file_mime,
-                    choice_D_text, choice_D_file, choice_D_file_type, choice_D_file_mime
-                )
-                SELECT quiz_set_id, question, optional_text,
-                       correct_answer, question_type, question_word_formatting, optional_word_formatting,
-                       question_file, question_file_type, question_file_mime,
-                       choice_A_text, choice_A_file, choice_A_file_type, choice_A_file_mime,
-                       choice_B_text, choice_B_file, choice_B_file_type, choice_B_file_mime,
-                       choice_C_text, choice_C_file, choice_C_file_type, choice_C_file_mime,
-                       choice_D_text, choice_D_file, choice_D_file_type, choice_D_file_mime
-                FROM questions WHERE id = ?
-            ";
-            $backupStmt = \EMA\Config\Database::prepare($backupQuery);
-            $backupStmt->bind_param('i', $id);
-            $backupStmt->execute();
-            $backupStmt->close();
-
             // Delete physical files (handle both legacy and new path formats)
             $fileFields = ['question_file', 'choice_A_file', 'choice_B_file', 'choice_C_file', 'choice_D_file'];
             foreach ($fileFields as $field) {

@@ -68,7 +68,8 @@ class AccessService
         // Check if item exists
         $table = $data['item_type'] === 'file' ? 'files' : 'quiz_sets';
         $stmt = \EMA\Config\Database::prepare("SELECT id FROM $table WHERE id = ? LIMIT 1");
-        $stmt->bind_param('i', (int) $data['item_id']);
+        $itemId = (int) $data['item_id'];
+        $stmt->bind_param('i', $itemId);
         $stmt->execute();
         $stmt->store_result();
 

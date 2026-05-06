@@ -481,12 +481,6 @@ class QuizController
             $data = $this->request->allInput();
             $data = $this->mergeQuestionFileUploads($data);
 
-            // Validate CSRF token
-            if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
-                $this->response->validationError(['csrf_token' => 'Invalid CSRF token']);
-                return;
-            }
-
             // Validate input data
             $validation = $this->quizService->validateQuestionData($data);
 
@@ -543,14 +537,6 @@ class QuizController
             // Check if question belongs to quiz set
             if ($question['quiz_set_id'] != $id) {
                 $this->response->badRequest('Question does not belong to this quiz set');
-                return;
-            }
-
-            $data = $this->request->allInput();
-
-            // Validate CSRF token
-            if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
-                $this->response->validationError(['csrf_token' => 'Invalid CSRF token']);
                 return;
             }
 
@@ -1185,9 +1171,6 @@ class QuizController
                 $this->response->forbidden('Admin access required');
                 return;
             }
-
-            // Get current user
-            $currentUser = \EMA\Middleware\AuthMiddleware::getCurrentUser();
 
             // Get quiz set details
             $quizSet = QuizSet::findById($id);
