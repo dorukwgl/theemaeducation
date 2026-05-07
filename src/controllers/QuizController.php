@@ -1138,12 +1138,6 @@ class QuizController
 
             if ($result) {
                 $updatedQuizSet = QuizSet::findById($id);
-                Logger::log('Quiz set status updated', [
-                    'quiz_set_id' => $id,
-                    'old_status' => $quizSet['status'],
-                    'new_status' => $newStatus,
-                    'updated_by' => $currentUser['id']
-                ]);
                 $this->response->success($updatedQuizSet, 'Quiz set status updated successfully');
             } else {
                 $this->response->error('Failed to update quiz set status', 500);
