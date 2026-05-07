@@ -92,16 +92,28 @@ composer migrate          # run migrations
 php -l path/to/file.php   # syntax check
 ```
 
-## Graphify (primary codebase interface)
+## Codebase tooling
 
-Knowledge graph at `graphify-out/`.
+Two complementary tools for codebase understanding:
 
-### Read via graph first
-**Always use `graphify query "..."` to answer codebase questions before reading files directly.** The graph has 3,800+ nodes and 6,100+ edges covering the full application. Querying the graph is faster and cheaper than raw file reads, and surfaces cross-module relationships you'd miss reading files in isolation.
+### Graphify (AST knowledge graph)
+Knowledge graph at `graphify-out/`. Use for high-level structural queries and cross-module relationships.
 
-Only read files directly (`Read` tool) when `graphify query` can't find what you need or you need exact line-level details.
+**Always use `graphify query "..."` to answer codebase questions before reading files directly.** Querying the graph is faster and cheaper than raw file reads.
 
-For quick orientation: read `graphify-out/GRAPH_REPORT.md` first (god nodes & community structure). If `graphify-out/wiki/index.md` exists, prefer it over raw files.
+- Only read files directly when `graphify query` can't find what you need
+- For orientation: read `graphify-out/GRAPH_REPORT.md` first (god nodes & community)
+- **Run `graphify update .` after every change** — AST-only, no API cost, not optional
 
-### Update after every change
-**Run `graphify update .` after every change.** It's free (AST-only, no API cost) and keeps the graph current. This is not optional — always do it as the final step of any modification.
+### context-mode (semantic indexing)
+**Always use context-mode on any output exceeding ~20 lines** (logs, API responses, test output, git diffs, search results, large file reads). It handles efficient processing and summarization of large data.
+
+### When to use which
+| Scenario | Tool |
+|---|---|
+| Architecture questions, cross-module relationships | graphify query |
+| Large output processing, log analysis, diff review | context-mode |
+| Graphify unavailable or insufficient | context-mode (always available) |
+| After every code change | graphify update |
+
+**Always use both where applicable.** context-mode is the universal fallback — always available, always on.

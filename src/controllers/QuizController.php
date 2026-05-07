@@ -619,7 +619,7 @@ class QuizController
                 VALUES (?, ?, ?, NOW(), ?)
             ");
             $ipAddress = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : null;
-            $stmt->bind_param('iis', $id, $userId, $attemptNumber, $ipAddress);
+            $stmt->bind_param('iiss', $id, $userId, $attemptNumber, $ipAddress);
             $stmt->execute();
             $attemptId = $stmt->insert_id;
             $stmt->close();
