@@ -673,7 +673,7 @@ class QuizController
 
             // Get attempt details
             $stmt = \EMA\Config\Database::prepare("
-                SELECT id, user_id, quiz_set_id, started_at
+                SELECT id, user_id, quiz_set_id, started_at, completed_at
                 FROM quiz_attempts
                 WHERE id = ? LIMIT 1
             ");

@@ -309,6 +309,12 @@ class QuizService
             // Shuffle question order
             shuffle($selectedQuestions);
 
+            // Strip correct_answer so it's not leaked to the client before submission
+            $selectedQuestions = array_map(function ($q) {
+                unset($q['correct_answer']);
+                return $q;
+            }, $selectedQuestions);
+
             return [
                 'success' => true,
                 'message' => 'Random quiz generated successfully',
@@ -398,18 +404,24 @@ class QuizService
                 $percentage = round(($correctAnswers / $totalQuestions) * 100, 2);
             }
 
-            // Calculate time spent
+            // Use MySQL NOW() as single source of truth (same as started_at)
+            $stmt = \EMA\Config\Database::prepare("SELECT NOW() as now");
+            $stmt->execute();
+            $mysqlNow = $stmt->get_result()->fetch_assoc()['now'];
+            $stmt->close();
+
+            // Calculate time spent server-side
             $startedAt = strtotime($attempt['started_at']);
-            $completedAt = $attempt['completed_at'] ? strtotime($attempt['completed_at']) : time();
+            $completedAt = $attempt['completed_at'] ? strtotime($attempt['completed_at']) : strtotime($mysqlNow);
             $timeSpentSeconds = $completedAt - $startedAt;
 
             // Update attempt record
             $stmt = \EMA\Config\Database::prepare("
                 UPDATE quiz_attempts
-                SET score = ?, correct_answers = ?, time_spent_seconds = ?, completed_at = COALESCE(completed_at, NOW())
+                SET score = ?, correct_answers = ?, time_spent_seconds = ?, completed_at = COALESCE(completed_at, ?)
                 WHERE id = ?
             ");
-            $stmt->bind_param('iii', $correctAnswers, $totalQuestions, $timeSpentSeconds, $attemptId);
+            $stmt->bind_param('iiisi', $correctAnswers, $totalQuestions, $timeSpentSeconds, $mysqlNow, $attemptId);
             $stmt->execute();
             $stmt->close();
 
