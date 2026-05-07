@@ -650,7 +650,6 @@ class FileController
             }
 
             $data = $this->request->allInput();
-            Logger::log("data: " . json_encode($data));
             
             if (empty($data) && !isset($_FILES['file']) && !isset($_FILES['icon'])) {
                 $this->response->error('No data provided', 400);
@@ -678,8 +677,6 @@ class FileController
                 if (!is_dir($uploadDir)) {
                     mkdir($uploadDir, 0755, true);
                 }
-
-                Logger::log("Moving file from " . $uploadedFile['tmp_name'] . " to " . $fullPath);
 
                 if (!move_uploaded_file($uploadedFile['tmp_name'], $fullPath)) {
                     $this->response->error('Failed to upload file', 500);
@@ -1061,12 +1058,6 @@ class FileController
 
             if ($result) {
                 $updatedFile = File::findById($id);
-                Logger::log('File status updated', [
-                    'file_id' => $id,
-                    'old_status' => $file['status'],
-                    'new_status' => $newStatus,
-                    'updated_by' => $currentUser['id']
-                ]);
                 $this->response->success($updatedFile, 'File status updated successfully');
             } else {
                 $this->response->error('Failed to update file status', 500);
@@ -1118,12 +1109,6 @@ class FileController
 
             if ($result) {
                 $updatedFile = File::findById($id);
-                Logger::log('File access type updated', [
-                    'file_id' => $id,
-                    'old_access_type' => $file['access_type'],
-                    'new_access_type' => $newAccessType,
-                    'updated_by' => $currentUser['id']
-                ]);
                 $this->response->success($updatedFile, 'File access type updated successfully');
             } else {
                 $this->response->error('Failed to update file access type', 500);

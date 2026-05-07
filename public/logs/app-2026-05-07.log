@@ -1,6 +1,0 @@
-[2026-05-07T10:27:43.303833+00:00] stack.INFO: File access type updated {"file_id":101,"new_access_type":"all"} []
-[2026-05-07T10:27:43.305392+00:00] stack.INFO: File access type updated {"file_id":101,"old_access_type":"logged_in","new_access_type":"all","updated_by":48} []
-[2026-05-07T10:28:49.374662+00:00] stack.INFO: File access type updated {"file_id":101,"new_access_type":"logged_in"} []
-[2026-05-07T10:28:49.375666+00:00] stack.INFO: File access type updated {"file_id":101,"old_access_type":"all","new_access_type":"logged_in","updated_by":48} []
-[2026-05-07T10:28:59.144862+00:00] stack.INFO: File access type updated {"file_id":101,"new_access_type":"private"} []
-[2026-05-07T10:28:59.145809+00:00] stack.INFO: File access type updated {"file_id":101,"old_access_type":"logged_in","new_access_type":"private","updated_by":48} []
