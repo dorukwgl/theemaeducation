@@ -283,7 +283,7 @@ class FileController
             }
 
             // Validate file path (prevent directory traversal)
-            $fullFilePath = ROOT_PATH . '/' . $file['file_path'];
+            $fullFilePath = ROOT_PATH . '/uploads/' . $file['file_path'];
             $realPath = realpath($fullFilePath);
             $uploadsPath = realpath(ROOT_PATH . '/uploads/files/');
 
@@ -353,7 +353,7 @@ class FileController
             }
 
             // Validate file path (prevent directory traversal)
-            $fullFilePath = ROOT_PATH . '/' . $file['file_path'];
+            $fullFilePath = ROOT_PATH . '/uploads/' . $file['file_path'];
             $realPath = realpath($fullFilePath);
             $uploadsPath = realpath(ROOT_PATH . '/uploads/files/');
 
@@ -834,7 +834,7 @@ class FileController
             }
 
             // Validate file path (prevent directory traversal)
-            $fullFilePath = ROOT_PATH . '/' . $file['file_path'];
+            $fullFilePath = ROOT_PATH . '/uploads/' . $file['file_path'];
             $realPath = realpath($fullFilePath);
             $uploadsPath = realpath(ROOT_PATH . '/uploads/files/');
 
@@ -900,7 +900,7 @@ class FileController
             }
 
             // Validate file path (prevent directory traversal)
-            $fullFilePath = ROOT_PATH . '/' . $file['file_path'];
+            $fullFilePath = ROOT_PATH . '/uploads/' . $file['file_path'];
             $realPath = realpath($fullFilePath);
             $uploadsPath = realpath(ROOT_PATH . '/uploads/files/');
 
