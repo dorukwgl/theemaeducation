@@ -507,39 +507,22 @@ class QuizSet
                 return false;
             }
 
-            // Check if quiz set is published
+            // Check access_type first — public/logged_in allowed regardless of publish status
+            $accessType = $quizSet['access_type'];
+            if ($accessType === Constants::ACCESS_ALL || $accessType === Constants::ACCESS_LOGGED_IN) {
+                return true;
+            }
+
+            // Private: enforce publish status, then check individual grants
             if (!$quizSet['is_published']) {
                 return false;
             }
 
-            // Check quiz set status - only published quiz sets are accessible
             if ($quizSet['status'] !== Constants::STATUS_PUBLISHED) {
                 return false;
             }
 
-            // Check quiz set access_type
-            $accessType = $quizSet['access_type'];
-
-            // Public access
-            if ($accessType === Constants::ACCESS_ALL) {
-                return true;
-            }
-
-            // Logged-in access
-            if ($accessType === Constants::ACCESS_LOGGED_IN) {
-                // User must be authenticated (checked by caller)
-                return true;
-            }
-
-            // Private access - check individual permissions via Access model
-            if ($accessType === Constants::ACCESS_PRIVATE) {
-                return Access::checkAccess($userId, $quizSetId, 'quiz_set');
-            }
-
-            // Check individual permissions
-            $hasAccess = Access::checkAccess($userId, $quizSetId, 'quiz_set');
-
-            return $hasAccess;
+            return Access::checkAccess($userId, $quizSetId, 'quiz_set');
         } catch (\Exception $e) {
             Logger::error('Error checking quiz set access', [
                 'user_id' => $userId,

@@ -94,7 +94,6 @@ class QuizController
                 'pagination' => $quizSets['pagination'],
                 'total' => $quizSets['total']
             ], 'Quiz sets retrieved successfully');
-
         } catch (\Exception $e) {
             Logger::error('Error listing quiz sets', [
                 'error' => $e->getMessage(),
@@ -161,7 +160,6 @@ class QuizController
             }
 
             $this->response->success($responseData, 'Quiz set retrieved successfully');
-
         } catch (\Exception $e) {
             Logger::error('Error getting quiz set details', [
                 'quiz_set_id' => $id,
@@ -182,7 +180,7 @@ class QuizController
     {
         try {
             $data = $this->request->allInput();
-            
+
             // Include icon from files if present
             if ($this->request->hasFile('icon')) {
                 $data['icon'] = $_FILES['icon'];
@@ -334,10 +332,19 @@ class QuizController
                 $this->response->notFound('Quiz set not found');
                 return;
             }
-            // Admins bypass all access restrictions; non-admins checked via published/draft/access_type
-            if (!User::isAdminById($userId) && !QuizSet::checkQuizSetAccess($userId, $id)) {
-                $this->response->forbidden('Access denied to quiz set');
-                return;
+            // Non-admins: check published status then access_type
+            if (!User::isAdminById($userId)) {
+                if (!$quizSet['is_published']) {
+                    $this->response->forbidden('Access denied to quiz set');
+                    return;
+                }
+                // Unpublished: allow public/logged_in, fall to checkQuizSetAccess for private
+                if ($quizSet['access_type'] === 'private') {
+                    if (!QuizSet::checkQuizSetAccess($userId, $id)) {
+                        $this->response->forbidden('Access denied to quiz set');
+                        return;
+                    }
+                }
             }
 
             // Get questions
@@ -415,7 +422,7 @@ class QuizController
                 $contentLength = $this->request->getHeader('Content-Length', 'unknown');
                 $this->response->error(
                     "Upload failed: request body ({$contentLength} bytes) exceeds upload limits. " .
-                    'Ask the server administrator to increase post_max_size and upload_max_filesize.',
+                        'Ask the server administrator to increase post_max_size and upload_max_filesize.',
                     413
                 );
                 return;

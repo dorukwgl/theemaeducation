@@ -276,10 +276,18 @@ class FileController
                 return;
             }
 
-            // Check access using File model's access control
-            if (!File::checkFileAccess($userId, $id)) {
-                $this->response->error('You do not have permission to access this file', 403);
-                return;
+            // Non-admins: check active status then access_type
+            if (!User::isAdminById($userId)) {
+                if ($file['status'] !== 'active') {
+                    $this->response->error('File not available', 403);
+                    return;
+                }
+                if ($file['access_type'] === 'private') {
+                    if (!File::checkFileAccess($userId, $id)) {
+                        $this->response->error('You do not have permission to access this file', 403);
+                        return;
+                    }
+                }
             }
 
             // Validate file path (prevent directory traversal)
@@ -346,10 +354,18 @@ class FileController
                 return;
             }
 
-            // Check access using File model's access control
-            if (!File::checkFileAccess($userId, $id)) {
-                $this->response->error('You do not have permission to download this file', 403);
-                return;
+            // Non-admins: check active status then access_type
+            if (!User::isAdminById($userId)) {
+                if ($file['status'] !== 'active') {
+                    $this->response->error('File not available', 403);
+                    return;
+                }
+                if ($file['access_type'] === 'private') {
+                    if (!File::checkFileAccess($userId, $id)) {
+                        $this->response->error('You do not have permission to download this file', 403);
+                        return;
+                    }
+                }
             }
 
             // Validate file path (prevent directory traversal)

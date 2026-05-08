@@ -342,31 +342,18 @@ class File
                 return false;
             }
 
-            // Check file status - inactive files are not accessible
+            // Check access_type first — public/logged_in allowed regardless of status
+            $accessType = $file['access_type'];
+            if ($accessType === Constants::ACCESS_ALL || $accessType === Constants::ACCESS_LOGGED_IN) {
+                return true;
+            }
+
+            // Private: enforce active status, then check individual grants
             if ($file['status'] !== Constants::STATUS_ACTIVE) {
                 return false;
             }
 
-            // Check file access_type
-            $accessType = $file['access_type'];
-
-            // Public access (all)
-            if ($accessType === Constants::ACCESS_ALL) {
-                return true;
-            }
-
-            // Logged-in access
-            if ($accessType === Constants::ACCESS_LOGGED_IN) {
-                // User must be authenticated (checked by caller)
-                return true;
-            }
-
-            // Private access - check individual permissions via Access model
-            if ($accessType === Constants::ACCESS_PRIVATE) {
-                return \EMA\Models\Access::checkAccess($userId, $fileId, 'file');
-            }
-
-            return false;
+            return \EMA\Models\Access::checkAccess($userId, $fileId, 'file');
         } catch (\Exception $e) {
             Logger::error('Error checking file access', [
                 'user_id' => $userId,
