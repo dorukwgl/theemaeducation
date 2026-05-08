@@ -5,7 +5,6 @@ namespace EMA\Controllers;
 use EMA\Models\Notice;
 use EMA\Services\NoticeService;
 use EMA\Utils\Logger;
-use EMA\Utils\Security;
 use EMA\Core\Request;
 use EMA\Core\Response;
 use EMA\Middleware\AuthMiddleware;
@@ -243,13 +242,6 @@ class NoticeController
                 return;
             }
 
-            $data = $this->request->allInput();
-
-            if (!Security::verifyCsrfToken($data['csrf_token'] ?? '')) {
-                $this->response->error('Invalid CSRF token', 422);
-                return;
-            }
-
             if (Notice::delete($id)) {
                 $this->response->success([], 'Notice deleted successfully');
             } else {
@@ -258,6 +250,95 @@ class NoticeController
         } catch (\Exception $e) {
             Logger::error('Error deleting notice', ['notice_id' => $id, 'error' => $e->getMessage()]);
             $this->response->error('Failed to delete notice', 500);
+        }
+    }
+
+    public function downloadAttachment(int $id): void
+    {
+        try {
+            $currentUser = AuthMiddleware::getCurrentUser();
+            if (!$currentUser) {
+                $this->response->error('Authentication required', 401);
+                return;
+            }
+
+            $attachment = Notice::findAttachmentById($id);
+            if (!$attachment) {
+                $this->response->error('Attachment not found', 404);
+                return;
+            }
+
+            $fullFilePath = ROOT_PATH . '/uploads/' . $attachment['file_path'];
+            $realPath = realpath($fullFilePath);
+
+            $allowedPaths = [
+                realpath(ROOT_PATH . '/uploads/files/'),
+                realpath(ROOT_PATH . '/uploads/icons/'),
+                realpath(ROOT_PATH . '/uploads/folders/'),
+                realpath(ROOT_PATH . '/uploads/notices/'),
+                realpath(ROOT_PATH . '/uploads/profile_images/'),
+                realpath(ROOT_PATH . '/uploads/questions/'),
+                realpath(ROOT_PATH . '/uploads/choices/'),
+            ];
+
+            $isAllowedPath = false;
+            foreach ($allowedPaths as $allowedPath) {
+                if ($allowedPath && strpos($realPath, $allowedPath) === 0) {
+                    $isAllowedPath = true;
+                    break;
+                }
+            }
+
+            if (!$realPath || !$isAllowedPath) {
+                $this->response->error('Invalid file path', 403);
+                return;
+            }
+
+            if (!file_exists($fullFilePath)) {
+                $this->response->error('File not found', 404);
+                return;
+            }
+
+            $extension = strtolower(pathinfo($attachment['file_path'], PATHINFO_EXTENSION));
+            $mimeMap = [
+                'pdf' => 'application/pdf',
+                'doc' => 'application/msword',
+                'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'txt' => 'text/plain',
+                'jpg' => 'image/jpeg',
+                'jpeg' => 'image/jpeg',
+                'png' => 'image/png',
+                'gif' => 'image/gif',
+                'webp' => 'image/webp',
+                'mp3' => 'audio/mpeg',
+                'wav' => 'audio/wav',
+                'aac' => 'audio/aac',
+                'mp4' => 'video/mp4',
+                'webm' => 'video/webm',
+            ];
+            $contentType = $mimeMap[$extension] ?? 'application/octet-stream';
+
+            $fileSize = filesize($fullFilePath);
+            $safeFilename = basename($attachment['file_name']);
+
+            header('Content-Type: ' . $contentType);
+            header('Content-Disposition: attachment; filename="' . $safeFilename . '"');
+            header('Content-Length: ' . $fileSize);
+            header('Cache-Control: no-cache, must-revalidate');
+            header('Pragma: no-cache');
+            header('Expires: 0');
+
+            if ($fileHandle = fopen($fullFilePath, 'rb')) {
+                while (!feof($fileHandle)) {
+                    echo fread($fileHandle, 8192);
+                }
+                fclose($fileHandle);
+            } else {
+                $this->response->error('Failed to download file', 500);
+            }
+        } catch (\Exception $e) {
+            Logger::error('Error downloading notice attachment', ['attachment_id' => $id, 'error' => $e->getMessage()]);
+            $this->response->error('Failed to download file', 500);
         }
     }
 }

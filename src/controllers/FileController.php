@@ -268,16 +268,25 @@ class FileController
             $currentUser = AuthMiddleware::getCurrentUser();
             $userId = $currentUser['id'] ?? null;
 
-            // Get file details
+            // Get file details — try files table first, fall back to notice_attachments
             $file = File::findById($id);
+            $isNoticeAttachment = false;
 
             if (!$file) {
-                $this->response->error('File not found', 404);
-                return;
+                $attachment = \EMA\Models\Notice::findAttachmentById($id);
+                if (!$attachment) {
+                    $this->response->error('File not found', 404);
+                    return;
+                }
+                $isNoticeAttachment = true;
+                $file = [
+                    'file_path' => $attachment['file_path'],
+                    'name' => $attachment['file_name'],
+                ];
             }
 
-            // Non-admins: check active status then access_type
-            if (!User::isAdminById($userId)) {
+            // Non-admins: check active status then access_type (skip for notice attachments — auth-only)
+            if (!$isNoticeAttachment && !User::isAdminById($userId)) {
                 if ($file['status'] !== 'active') {
                     $this->response->error('File not available', 403);
                     return;
@@ -293,9 +302,26 @@ class FileController
             // Validate file path (prevent directory traversal)
             $fullFilePath = ROOT_PATH . '/uploads/' . $file['file_path'];
             $realPath = realpath($fullFilePath);
-            $uploadsPath = realpath(ROOT_PATH . '/uploads/files/');
 
-            if (!$realPath || strpos($realPath, $uploadsPath) !== 0) {
+            $allowedPaths = [
+                realpath(ROOT_PATH . '/uploads/files/'),
+                realpath(ROOT_PATH . '/uploads/icons/'),
+                realpath(ROOT_PATH . '/uploads/folders/'),
+                realpath(ROOT_PATH . '/uploads/notices/'),
+                realpath(ROOT_PATH . '/uploads/profile_images/'),
+                realpath(ROOT_PATH . '/uploads/questions/'),
+                realpath(ROOT_PATH . '/uploads/choices/'),
+            ];
+
+            $isAllowedPath = false;
+            foreach ($allowedPaths as $allowedPath) {
+                if ($allowedPath && strpos($realPath, $allowedPath) === 0) {
+                    $isAllowedPath = true;
+                    break;
+                }
+            }
+
+            if (!$realPath || !$isAllowedPath) {
                 $this->response->error('Invalid file path', 403);
                 return;
             }
@@ -346,16 +372,25 @@ class FileController
             $currentUser = AuthMiddleware::getCurrentUser();
             $userId = $currentUser['id'] ?? null;
 
-            // Get file details
+            // Get file details — try files table first, fall back to notice_attachments
             $file = File::findById($id);
+            $isNoticeAttachment = false;
 
             if (!$file) {
-                $this->response->error('File not found', 404);
-                return;
+                $attachment = \EMA\Models\Notice::findAttachmentById($id);
+                if (!$attachment) {
+                    $this->response->error('File not found', 404);
+                    return;
+                }
+                $isNoticeAttachment = true;
+                $file = [
+                    'file_path' => $attachment['file_path'],
+                    'name' => $attachment['file_name'],
+                ];
             }
 
-            // Non-admins: check active status then access_type
-            if (!User::isAdminById($userId)) {
+            // Non-admins: check active status then access_type (skip for notice attachments — auth-only)
+            if (!$isNoticeAttachment && !User::isAdminById($userId)) {
                 if ($file['status'] !== 'active') {
                     $this->response->error('File not available', 403);
                     return;
@@ -371,9 +406,26 @@ class FileController
             // Validate file path (prevent directory traversal)
             $fullFilePath = ROOT_PATH . '/uploads/' . $file['file_path'];
             $realPath = realpath($fullFilePath);
-            $uploadsPath = realpath(ROOT_PATH . '/uploads/files/');
 
-            if (!$realPath || strpos($realPath, $uploadsPath) !== 0) {
+            $allowedPaths = [
+                realpath(ROOT_PATH . '/uploads/files/'),
+                realpath(ROOT_PATH . '/uploads/icons/'),
+                realpath(ROOT_PATH . '/uploads/folders/'),
+                realpath(ROOT_PATH . '/uploads/notices/'),
+                realpath(ROOT_PATH . '/uploads/profile_images/'),
+                realpath(ROOT_PATH . '/uploads/questions/'),
+                realpath(ROOT_PATH . '/uploads/choices/'),
+            ];
+
+            $isAllowedPath = false;
+            foreach ($allowedPaths as $allowedPath) {
+                if ($allowedPath && strpos($realPath, $allowedPath) === 0) {
+                    $isAllowedPath = true;
+                    break;
+                }
+            }
+
+            if (!$realPath || !$isAllowedPath) {
                 $this->response->error('Invalid file path', 403);
                 return;
             }

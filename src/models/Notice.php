@@ -108,6 +108,7 @@ class Notice
                         'mime_type' => $a['mime_type'],
                         'file_type' => $a['file_type'],
                         'uploaded_at' => $a['uploaded_at'],
+                        'download_url' => '/api/notices/attachments/' . (int) $a['id'] . '/download',
                     ];
                 }
                 $attStmt->close();
@@ -256,6 +257,7 @@ class Notice
                     'mime_type' => $row['mime_type'],
                     'file_type' => $row['file_type'],
                     'uploaded_at' => $row['uploaded_at'],
+                    'download_url' => '/api/notices/attachments/' . (int) $row['id'] . '/download',
                 ];
             }
             $stmt->close();
@@ -263,6 +265,42 @@ class Notice
         } catch (\Exception $e) {
             Logger::error('Error getting notice attachments', ['notice_id' => $noticeId, 'error' => $e->getMessage()]);
             return [];
+        }
+    }
+
+    public static function findAttachmentById(int $attachmentId): ?array
+    {
+        try {
+            $stmt = \EMA\Config\Database::prepare("
+                SELECT id, notice_id, file_name, file_path, file_size, mime_type, file_type, uploaded_at
+                FROM notice_attachments WHERE id = ? LIMIT 1
+            ");
+            $stmt->bind_param('i', $attachmentId);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if (!$result->num_rows) {
+                $stmt->close();
+                return null;
+            }
+
+            $a = $result->fetch_assoc();
+            $stmt->close();
+
+            return [
+                'id' => (int) $a['id'],
+                'notice_id' => (int) $a['notice_id'],
+                'file_name' => $a['file_name'],
+                'file_path' => $a['file_path'],
+                'file_size' => (int) $a['file_size'],
+                'mime_type' => $a['mime_type'],
+                'file_type' => $a['file_type'],
+                'uploaded_at' => $a['uploaded_at'],
+                'download_url' => '/api/notices/attachments/' . (int) $a['id'] . '/download',
+            ];
+        } catch (\Exception $e) {
+            Logger::error('Error finding notice attachment', ['attachment_id' => $attachmentId, 'error' => $e->getMessage()]);
+            return null;
         }
     }
 

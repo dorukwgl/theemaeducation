@@ -152,6 +152,7 @@ $router->get('/api/notices', [NoticeController::class, 'index']);
 $router->post('/api/notices', [NoticeController::class, 'store'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
 $router->post('/api/notices/{id}', [NoticeController::class, 'update'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
 $router->delete('/api/notices/{id}', [NoticeController::class, 'delete'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
+$router->get('/api/notices/attachments/{id}/download', [NoticeController::class, 'downloadAttachment'], [AuthMiddleware::class]);
 
 // Run the application
 $app->run();
