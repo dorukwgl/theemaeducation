@@ -118,11 +118,7 @@ $router->get('/api/admin/users/{userId}/quiz-sets/not-granted', [QuizController:
 $router->post('/api/access/grant', [AccessController::class, 'grant'], [AuthMiddleware::class, CsrfMiddleware::class]);
 
 // System routes
-$router->get('/api/notices', [SystemController::class, 'notices']);
-$router->post('/api/notices', [SystemController::class, 'storeNotice'], [AuthMiddleware::class, CsrfMiddleware::class]);
-$router->delete('/api/notices/{id}', [SystemController::class, 'deleteNotice'], [AuthMiddleware::class, CsrfMiddleware::class]);
 $router->post('/api/analytics/track-download', [SystemController::class, 'trackDownload'], [CsrfMiddleware::class]);
-$router->post('/api/content/free-access', [SystemController::class, 'freeAccess'], [AuthMiddleware::class, CsrfMiddleware::class]);
 
 // Quiz routes
 // Public quiz routes (NO authentication required)
@@ -151,19 +147,12 @@ $router->post('/api/quiz-sets/{id}/questions', [QuizController::class, 'createQu
 $router->post('/api/quiz-sets/{id}/questions/{question_id}', [QuizController::class, 'updateQuestion'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
 $router->delete('/api/quiz-sets/{id}/questions/{question_id}', [QuizController::class, 'deleteQuestion'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
 
-// Notice routes
+// Notice routes — public view, admin manage
 $router->get('/api/notices', [NoticeController::class, 'index']);
-$router->post('/api/notices', [NoticeController::class, 'store'], [AuthMiddleware::class, CsrfMiddleware::class]);
-$router->get('/api/notices/{id}', [NoticeController::class, 'show'], [AuthMiddleware::class]);
-$router->post('/api/notices/{id}', [NoticeController::class, 'update'], [AuthMiddleware::class, CsrfMiddleware::class]);
-$router->delete('/api/notices/{id}', [NoticeController::class, 'delete'], [AuthMiddleware::class, CsrfMiddleware::class]);
-$router->post('/api/notices/{id}/upload-attachment', [NoticeController::class, 'uploadAttachment'], [AuthMiddleware::class, CsrfMiddleware::class]);
-$router->delete('/api/notices/{id}/attachment', [NoticeController::class, 'deleteAttachment'], [AuthMiddleware::class, CsrfMiddleware::class]);
-$router->post('/api/notices/{id}/view', [NoticeController::class, 'trackView'], [CsrfMiddleware::class]);
-$router->post('/api/notices/{id}/dismiss', [NoticeController::class, 'dismiss'], [CsrfMiddleware::class]);
-$router->get('/api/notices/dismissed', [NoticeController::class, 'dismissed'], [CsrfMiddleware::class]);
-$router->get('/api/notices/{id}/statistics', [NoticeController::class, 'statistics'], [AuthMiddleware::class]);
-$router->post('/api/notices/bulk-update-status', [NoticeController::class, 'bulkUpdateStatus'], [AuthMiddleware::class, CsrfMiddleware::class]);
+$router->get('/api/notices/{id}', [NoticeController::class, 'show']);
+$router->post('/api/notices', [NoticeController::class, 'store'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
+$router->post('/api/notices/{id}', [NoticeController::class, 'update'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
+$router->delete('/api/notices/{id}', [NoticeController::class, 'delete'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
 
 // Run the application
 $app->run();

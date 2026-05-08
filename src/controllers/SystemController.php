@@ -54,14 +54,11 @@ class SystemController
 
             $stmt->close();
 
-            $this->response->success('System notices retrieved successfully', [
+            $this->response->success([
                 'notices' => $notices,
                 'total' => count($notices)
-            ]);
+            ], 'System notices retrieved successfully');
 
-            Logger::info('System notices accessed', [
-                'ip' => Security::getRealIp()
-            ]);
         } catch (\Exception $e) {
             Logger::error('System notices retrieval error', [
                 'error' => $e->getMessage(),
@@ -83,10 +80,6 @@ class SystemController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized notice creation attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can create system notices', 403);
                 return;
             }
@@ -123,19 +116,12 @@ class SystemController
                 $noticeId = $stmt->insert_id;
                 $stmt->close();
 
-                Logger::logSecurityEvent('System notice created', [
-                    'notice_id' => $noticeId,
-                    'title' => $title,
-                    'created_by' => $createdBy,
-                    'ip' => Security::getRealIp()
-                ]);
-
-                $this->response->success('System notice created successfully', [
+                $this->response->success([
                     'notice_id' => $noticeId,
                     'title' => $title,
                     'notice_type' => $noticeType,
                     'priority' => $priority
-                ]);
+                ], 'System notice created successfully');
             } else {
                 $stmt->close();
                 $this->response->error('Failed to create system notice', 500);
@@ -161,11 +147,6 @@ class SystemController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized notice deletion attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'notice_id' => $id,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can delete system notices', 403);
                 return;
             }
@@ -190,12 +171,6 @@ class SystemController
             $deleteStmt->close();
 
             if ($result) {
-                Logger::logSecurityEvent('System notice deleted', [
-                    'notice_id' => $id,
-                    'deleted_by' => $currentUser['id'],
-                    'ip' => Security::getRealIp()
-                ]);
-
                 $this->response->success('System notice deleted successfully');
             } else {
                 $this->response->error('Failed to delete system notice', 500);
@@ -250,13 +225,6 @@ class SystemController
 
             if ($stmt->execute()) {
                 $stmt->close();
-
-                Logger::info('File download tracked', [
-                    'file_id' => $fileId,
-                    'user_id' => $userId,
-                    'ip' => $ipAddress
-                ]);
-
                 $this->response->success('Download tracked successfully');
             } else {
                 $stmt->close();
@@ -284,10 +252,6 @@ class SystemController
 
             // Check if current user is admin
             if (!$currentUser || $currentUser['role'] !== 'admin') {
-                Logger::logSecurityEvent('Unauthorized free access management attempt', [
-                    'user_id' => $currentUser['id'] ?? null,
-                    'ip' => Security::getRealIp()
-                ]);
                 $this->response->error('Only admins can manage free access', 403);
                 return;
             }
@@ -334,21 +298,12 @@ class SystemController
 
             if ($stmt->execute()) {
                 $stmt->close();
-
-                Logger::logSecurityEvent('Free content access managed', [
-                    'item_id' => $itemId,
-                    'item_type' => $itemType,
-                    'is_free' => $isFree,
-                    'managed_by' => $managedBy,
-                    'ip' => Security::getRealIp()
-                ]);
-
                 $action = $isFree ? 'granted' : 'revoked';
-                $this->response->success("Free access {$action} successfully", [
+                $this->response->success([
                     'item_id' => $itemId,
                     'item_type' => $itemType,
                     'is_free' => $isFree
-                ]);
+                ], "Free access {$action} successfully");
             } else {
                 $stmt->close();
                 $this->response->error('Failed to manage free access', 500);
