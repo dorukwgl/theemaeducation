@@ -400,7 +400,7 @@ class QuizSet
                 return [];
             }
 
-            if (!$quizSet['is_published']) {
+            if (!$quizSet['is_published'] && (!$userId || !User::isAdminById($userId))) {
                 return [];
             }
 

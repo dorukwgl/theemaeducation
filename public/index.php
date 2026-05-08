@@ -149,7 +149,6 @@ $router->delete('/api/quiz-sets/{id}/questions/{question_id}', [QuizController::
 
 // Notice routes — public view, admin manage
 $router->get('/api/notices', [NoticeController::class, 'index']);
-$router->get('/api/notices/{id}', [NoticeController::class, 'show']);
 $router->post('/api/notices', [NoticeController::class, 'store'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
 $router->post('/api/notices/{id}', [NoticeController::class, 'update'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);
 $router->delete('/api/notices/{id}', [NoticeController::class, 'delete'], [new AuthMiddleware([EMA\Config\Constants::ROLE_ADMIN]), CsrfMiddleware::class]);

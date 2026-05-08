@@ -574,12 +574,13 @@ class File
                 $query .= " AND f.status = ?";
                 $params[] = $status;
                 $types .= 's';
-            } else {
-                // Default to active status if not specified
+            } elseif ($userId !== null) {
+                // Non-admin: default to active status only
                 $query .= " AND f.status = ?";
                 $params[] = Constants::STATUS_ACTIVE;
                 $types .= 's';
             }
+            // Admin (userId is null): no default status filter
 
             if ($userId !== null) {
                 $query .= " AND (
@@ -691,12 +692,13 @@ class File
                 $query .= " AND f.status = ?";
                 $params[] = $status;
                 $types .= 's';
-            } else {
-                // Default to active status if not specified
+            } elseif ($userId !== null) {
+                // Non-admin: default to active status only
                 $query .= " AND f.status = ?";
                 $params[] = Constants::STATUS_ACTIVE;
                 $types .= 's';
             }
+            // Admin (userId is null): no default status filter
 
             if ($userId !== null) {
                 $query .= " AND (
@@ -812,13 +814,6 @@ class File
             $result = $stmt->execute();
             $stmt->close();
 
-            if ($result) {
-                Logger::log('File status updated', [
-                    'file_id' => $fileId,
-                    'new_status' => $status
-                ]);
-            }
-
             return $result;
         } catch (\Exception $e) {
             Logger::error('Error updating file status', [
@@ -853,13 +848,6 @@ class File
             $stmt->bind_param('si', $accessType, $fileId);
             $result = $stmt->execute();
             $stmt->close();
-
-            if ($result) {
-                Logger::log('File access type updated', [
-                    'file_id' => $fileId,
-                    'new_access_type' => $accessType
-                ]);
-            }
 
             return $result;
         } catch (\Exception $e) {

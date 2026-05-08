@@ -70,6 +70,43 @@ class NoticeController
         }
     }
 
+    /**
+     * Normalize uploaded files from $_FILES['attachment'].
+     * Handles both single file and attachment[] array notation.
+     */
+    private function getNoticeUploadedFiles(): array
+    {
+        $raw = $this->request->allFiles();
+        $files = $raw['attachment'] ?? [];
+        if (empty($files)) {
+            return [];
+        }
+
+        // attachment[] array notation
+        if (is_array($files['error'] ?? null)) {
+            $result = [];
+            foreach ($files['error'] as $i => $err) {
+                if ($err === UPLOAD_ERR_OK) {
+                    $result[] = [
+                        'name'     => $files['name'][$i],
+                        'type'     => $files['type'][$i],
+                        'tmp_name' => $files['tmp_name'][$i],
+                        'error'    => $files['error'][$i],
+                        'size'     => $files['size'][$i],
+                    ];
+                }
+            }
+            return $result;
+        }
+
+        // Single attachment field
+        if ($files['error'] === UPLOAD_ERR_OK) {
+            return [$files];
+        }
+
+        return [];
+    }
+
     public function store(): void
     {
         try {
@@ -89,29 +126,34 @@ class NoticeController
             $sanitized = $validation['data'];
             $sanitized['created_by'] = AuthMiddleware::getCurrentUserId();
 
-            $fileUpload = null;
-            if ($this->request->hasFile('attachment')) {
-                $fileUpload = $this->noticeService->handleNoticeFileUpload($this->request->getFile('attachment'));
-                if (!$fileUpload['success']) {
+            $uploadedFiles = $this->getNoticeUploadedFiles();
+            $fileUploads = [];
+            foreach ($uploadedFiles as $uf) {
+                $result = $this->noticeService->handleNoticeFileUpload($uf);
+                if (!$result['success']) {
+                    foreach ($fileUploads as $uploaded) {
+                        @unlink(ROOT_PATH . '/uploads/' . $uploaded['file_path']);
+                    }
                     $this->response->error('File upload failed', 400, ['Failed to upload file']);
                     return;
                 }
+                $fileUploads[] = $result;
             }
 
             $noticeId = Notice::create($sanitized);
 
             if (!$noticeId) {
-                if ($fileUpload) {
-                    @unlink(ROOT_PATH . '/uploads/' . $fileUpload['file_path']);
+                foreach ($fileUploads as $uploaded) {
+                    @unlink(ROOT_PATH . '/uploads/' . $uploaded['file_path']);
                 }
                 $this->response->error('Failed to create notice', 500);
                 return;
             }
 
-            if ($fileUpload) {
-                $attachmentId = Notice::createAttachment($noticeId, $fileUpload);
+            foreach ($fileUploads as $uploaded) {
+                $attachmentId = Notice::createAttachment($noticeId, $uploaded);
                 if (!$attachmentId) {
-                    Logger::error('Notice created but attachment record failed', ['notice_id' => $noticeId]);
+                    Logger::error('Notice created but attachment record failed', ['notice_id' => $noticeId, 'file' => $uploaded['file_name']]);
                 }
             }
 
@@ -146,21 +188,33 @@ class NoticeController
 
             $sanitized = $validation['data'];
 
-            if ($this->request->hasFile('attachment')) {
-                $fileUpload = $this->noticeService->handleNoticeFileUpload($this->request->getFile('attachment'));
-                if (!$fileUpload['success']) {
-                    $this->response->error('File upload failed', 400, ['Failed to upload file']);
-                    return;
+            // Normalize uploaded files
+            $uploadedFiles = $this->getNoticeUploadedFiles();
+            if (!empty($uploadedFiles)) {
+                $fileUploads = [];
+                foreach ($uploadedFiles as $uf) {
+                    $result = $this->noticeService->handleNoticeFileUpload($uf);
+                    if (!$result['success']) {
+                        foreach ($fileUploads as $uploaded) {
+                            @unlink(ROOT_PATH . '/uploads/' . $uploaded['file_path']);
+                        }
+                        $this->response->error('File upload failed', 400, ['Failed to upload file']);
+                        return;
+                    }
+                    $fileUploads[] = $result;
                 }
 
+                // Replace all old attachments with the new ones
                 $oldAttachments = Notice::getNoticeAttachments($id);
                 foreach ($oldAttachments as $old) {
                     Notice::deleteAttachment($old['id']);
                 }
 
-                $attachmentId = Notice::createAttachment($id, $fileUpload);
-                if (!$attachmentId) {
-                    Logger::error('Notice updated but new attachment record failed', ['notice_id' => $id]);
+                foreach ($fileUploads as $uploaded) {
+                    $attachmentId = Notice::createAttachment($id, $uploaded);
+                    if (!$attachmentId) {
+                        Logger::error('Notice updated but attachment record failed', ['notice_id' => $id, 'file' => $uploaded['file_name']]);
+                    }
                 }
             }
 

@@ -605,7 +605,7 @@ class FileController
             $result = File::getFilesByFolderPaginated($folderId, $page, $perPage, $search, $accessType, $status, $userId);
 
             // Get total files count for access info
-            $totalFilesInFolder = File::getFilesByFolderCount($folderId, null, null, null);
+            $totalFilesInFolder = File::getFilesByFolderCount($folderId, null, null, $status, $userId);
             $accessibleFilesCount = ($currentUser['role'] === 'admin') ? $totalFilesInFolder : $result['total'];
 
             // Build access information

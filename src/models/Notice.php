@@ -69,9 +69,12 @@ class Notice
             $result = $stmt->get_result();
 
             $notices = [];
+            $ids = [];
             while ($row = $result->fetch_assoc()) {
-                $notices[] = [
-                    'id' => (int) $row['id'],
+                $id = (int) $row['id'];
+                $ids[] = $id;
+                $notices[$id] = [
+                    'id' => $id,
                     'title' => $row['title'],
                     'content' => $row['content'],
                     'notice_type' => $row['notice_type'],
@@ -85,13 +88,46 @@ class Notice
             }
             $stmt->close();
 
+            // Batch fetch attachments for all notices on this page
+            if (!empty($ids)) {
+                $placeholders = implode(',', array_fill(0, count($ids), '?'));
+                $types = str_repeat('i', count($ids));
+                $attStmt = \EMA\Config\Database::prepare("
+                    SELECT id, notice_id, file_name, file_path, file_size, mime_type, file_type, uploaded_at
+                    FROM notice_attachments WHERE notice_id IN ($placeholders) ORDER BY uploaded_at ASC
+                ");
+                $attStmt->bind_param($types, ...$ids);
+                $attStmt->execute();
+                $attResult = $attStmt->get_result();
+                while ($a = $attResult->fetch_assoc()) {
+                    $notices[(int) $a['notice_id']]['attachments'][] = [
+                        'id' => (int) $a['id'],
+                        'file_name' => $a['file_name'],
+                        'file_path' => $a['file_path'],
+                        'file_size' => (int) $a['file_size'],
+                        'mime_type' => $a['mime_type'],
+                        'file_type' => $a['file_type'],
+                        'uploaded_at' => $a['uploaded_at'],
+                    ];
+                }
+                $attStmt->close();
+            }
+
+            // Ensure every notice has an attachments key
+            foreach ($notices as &$n) {
+                if (!isset($n['attachments'])) {
+                    $n['attachments'] = [];
+                }
+            }
+            unset($n);
+
             $countStmt = \EMA\Config\Database::prepare("SELECT COUNT(*) FROM system_notices");
             $countStmt->execute();
             $totalCount = (int) $countStmt->get_result()->fetch_row()[0];
             $countStmt->close();
 
             return [
-                'notices' => $notices,
+                'notices' => array_values($notices),
                 'pagination' => [
                     'current_page' => $page,
                     'per_page' => $perPage,
@@ -109,17 +145,15 @@ class Notice
     {
         try {
             if (!isset($data['title']) || !isset($data['content']) || !isset($data['created_by'])) {
-                Logger::warning('Notice creation failed: Missing required fields');
                 return false;
             }
 
-            $db = \EMA\Config\Database::getInstance();
             $query = "
                 INSERT INTO system_notices (title, content, notice_type, priority, is_active, created_by, created_at, updated_at)
                 VALUES (?, ?, 'info', 'medium', 1, ?, NOW(), NOW())
             ";
 
-            $stmt = $db->prepare($query);
+            $stmt = \EMA\Config\Database::prepare($query);
             $stmt->bind_param('ssi', $data['title'], $data['content'], $data['created_by']);
 
             if ($stmt->execute()) {
@@ -235,8 +269,7 @@ class Notice
     public static function createAttachment(int $noticeId, array $data): int|false
     {
         try {
-            $db = \EMA\Config\Database::getInstance();
-            $stmt = $db->prepare("
+            $stmt = \EMA\Config\Database::prepare("
                 INSERT INTO notice_attachments (notice_id, file_name, file_path, file_size, mime_type, file_type, uploaded_at)
                 VALUES (?, ?, ?, ?, ?, ?, NOW())
             ");
