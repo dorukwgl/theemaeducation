@@ -156,7 +156,11 @@ class NoticeController
                 }
             }
 
-            $this->response->success(['notice' => Notice::findById($noticeId)], 'Notice created successfully', 201);
+            $attachments = Notice::getNoticeAttachments($noticeId);
+            $this->response->success([
+                'notice' => Notice::findById($noticeId),
+                'attachments' => $attachments,
+            ], 'Notice created successfully', 201);
         } catch (\Exception $e) {
             Logger::error('Error creating notice', ['error' => $e->getMessage()]);
             $this->response->error('Failed to create notice', 500);
@@ -187,9 +191,15 @@ class NoticeController
 
             $sanitized = $validation['data'];
 
-            // Normalize uploaded files
+            if (!Notice::update($id, $sanitized)) {
+                $this->response->error('Failed to update notice', 500);
+                return;
+            }
+
+            // Handle file uploads after notice update succeeds
             $uploadedFiles = $this->getNoticeUploadedFiles();
             if (!empty($uploadedFiles)) {
+
                 $fileUploads = [];
                 foreach ($uploadedFiles as $uf) {
                     $result = $this->noticeService->handleNoticeFileUpload($uf);
@@ -217,11 +227,12 @@ class NoticeController
                 }
             }
 
-            if (Notice::update($id, $sanitized)) {
-                $this->response->success(['notice' => Notice::findById($id)], 'Notice updated successfully');
-            } else {
-                $this->response->error('Failed to update notice', 500);
-            }
+            $attachments = Notice::getNoticeAttachments($id);
+            $noticeData = Notice::findById($id);
+            $this->response->success([
+                'notice' => $noticeData,
+                'attachments' => $attachments,
+            ], 'Notice updated successfully');
         } catch (\Exception $e) {
             Logger::error('Error updating notice', ['notice_id' => $id, 'error' => $e->getMessage()]);
             $this->response->error('Failed to update notice', 500);
