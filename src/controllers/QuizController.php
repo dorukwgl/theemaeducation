@@ -887,6 +887,48 @@ class QuizController
     }
 
     /**
+     * Public folder quiz sets - Get public published quiz sets in a specific folder
+     * GET /api/public/folder/{id}/quiz-sets
+     * No authentication required
+     */
+    public function publicFolderQuizSets(int $folderId): void
+    {
+        try {
+            $folder = \EMA\Models\Folder::findById($folderId);
+            if (!$folder) {
+                $this->response->notFound('Folder not found');
+                return;
+            }
+
+            $page = (int) ($this->request->getInput('page', 1));
+            $perPage = (int) ($this->request->getInput('per_page', 20));
+            $search = $this->request->getInput('search');
+            $includeQuestionCount = $this->request->getInput('include_question_count') === 'true';
+
+            if ($page < 1) $page = 1;
+            if ($perPage < 1 || $perPage > 100) $perPage = 20;
+
+            $quizSets = QuizSet::getPublicQuizSetsPaginated($page, $perPage, $search, $folderId, $includeQuestionCount);
+
+            $responseData = [
+                'folder' => $folder,
+                'quiz_sets' => $quizSets['quiz_sets'],
+                'pagination' => $quizSets['pagination']
+            ];
+
+            $this->response->success($responseData, 'Folder quiz sets retrieved successfully');
+        } catch (\Exception $e) {
+            Logger::error('Error getting public folder quiz sets', [
+                'folder_id' => $folderId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            $this->response->error('Failed to retrieve folder quiz sets', 500, ['Internal server error']);
+        }
+    }
+
+    /**
      * Public index - Get all public published quiz sets
      * GET /api/public/quiz-sets
      * No authentication required

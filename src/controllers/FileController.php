@@ -824,6 +824,56 @@ class FileController
     }
 
     /**
+     * Public folder files - Get public active files in a specific folder
+     * GET /api/public/folder/{id}/files
+     * No authentication required
+     */
+    public function publicFolderFiles(int $folderId): void
+    {
+        try {
+            $folder = Folder::findById($folderId);
+            if (!$folder) {
+                $this->response->error('Folder not found', 404);
+                return;
+            }
+
+            $page = (int) ($this->request->getQueryParameter('page', 1));
+            $perPage = (int) ($this->request->getQueryParameter('per_page', 20));
+
+            $validation = Validator::make([
+                'page' => $page,
+                'per_page' => $perPage
+            ], [
+                'page' => 'integer|min:1',
+                'per_page' => 'integer|between:1,100'
+            ]);
+
+            if (!$validation->validate()) {
+                $this->response->validationError($validation->getErrors(), 'Invalid pagination parameters');
+                return;
+            }
+
+            $search = $this->request->getQueryParameter('search');
+            $result = File::getPublicFilesPaginated($page, $perPage, $search, $folderId);
+
+            $responseData = [
+                'folder' => $folder,
+                'files' => $result['files'],
+                'pagination' => $result['pagination']
+            ];
+
+            $this->response->success($responseData, 'Folder files retrieved successfully');
+        } catch (\Exception $e) {
+            Logger::error('Public folder files listing error', [
+                'folder_id' => $folderId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->response->error('Failed to retrieve folder files', 500);
+        }
+    }
+
+    /**
      * Public index - Get all public active files
      * GET /api/public/files
      * No authentication required

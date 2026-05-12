@@ -69,6 +69,8 @@ $router->delete('/api/folders/{id}', [FolderController::class, 'delete'], [AuthM
 
 // File routes
 // Public file routes (NO authentication required)
+$router->get('/api/public/folders', [FolderController::class, 'publicIndex']);
+$router->get('/api/public/folder/{id}/files', [FileController::class, 'publicFolderFiles']);
 $router->get('/api/public/files', [FileController::class, 'publicIndex']);
 $router->get('/api/public/files/{id}', [FileController::class, 'publicShow']);
 $router->get('/api/public/files/{id}/download', [FileController::class, 'publicDownload']);
@@ -122,6 +124,7 @@ $router->post('/api/analytics/track-download', [SystemController::class, 'trackD
 
 // Quiz routes
 // Public quiz routes (NO authentication required)
+$router->get('/api/public/folder/{id}/quiz-sets', [QuizController::class, 'publicFolderQuizSets']);
 $router->get('/api/public/quiz-sets', [QuizController::class, 'publicIndex']);
 $router->get('/api/public/quiz-sets/{id}', [QuizController::class, 'publicShow']);
 $router->get('/api/public/quiz-sets/{id}/questions', [QuizController::class, 'publicQuestions']);
