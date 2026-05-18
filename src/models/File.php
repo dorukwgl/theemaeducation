@@ -1293,7 +1293,7 @@ class File
             $identifier = 'user_' . $userId;
 
             $query = "
-                SELECT f.id, f.name, f.file_path, f.icon_path, f.access_type, f.status, f.created_at,
+                SELECT f.id, f.folder_id, f.name, f.file_path, f.icon_path, f.access_type, f.status, f.created_at,
                        fl.name as folder_name, fl.icon_path as folder_icon_path,
                        ap.access_times, ap.times_accessed, ap.is_active as grant_active, ap.granted_at
                 FROM files f
@@ -1355,6 +1355,7 @@ class File
             while ($row = $result->fetch_assoc()) {
                 $files[] = [
                     'id' => (int) $row['id'],
+                    'folder_id' => (int) $row['folder_id'],
                     'name' => $row['name'],
                     'file_path' => $row['file_path'],
                     'icon_path' => $row['icon_path'],
@@ -1422,7 +1423,7 @@ class File
             $identifier = 'user_' . $userId;
 
             $query = "
-                SELECT f.id, f.name, f.file_path, f.icon_path, f.access_type, f.status, f.created_at,
+                SELECT f.id, f.folder_id, f.name, f.file_path, f.icon_path, f.access_type, f.status, f.created_at,
                        fl.name as folder_name, fl.icon_path as folder_icon_path
                 FROM files f
                 LEFT JOIN folders fl ON f.folder_id = fl.id
@@ -1483,6 +1484,7 @@ class File
             while ($row = $result->fetch_assoc()) {
                 $files[] = [
                     'id' => (int) $row['id'],
+                    'folder_id' => (int) $row['folder_id'],
                     'name' => $row['name'],
                     'file_path' => $row['file_path'],
                     'icon_path' => $row['icon_path'],
