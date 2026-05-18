@@ -1390,7 +1390,7 @@ class QuizSet
      * @param string|null $search Optional search term
      * @return array Paginated quiz sets with permission metadata
      */
-    public static function getGrantedQuizSetsForUser(int $userId, int $page, int $perPage, ?int $folderId = null, ?string $search = null): array
+    public static function getGrantedQuizSetsForUser(int $userId, int $page, int $perPage, ?int $folderId = null, ?string $search = null, ?string $status = null): array
     {
         try {
             $identifier = 'user_' . $userId;
@@ -1431,6 +1431,15 @@ class QuizSet
                 $countParams[] = $folderId;
                 $types .= 'i';
                 $countTypes .= 'i';
+            }
+
+            if ($status !== null) {
+                $query .= " AND qs.status = ?";
+                $countQuery .= " AND qs.status = ?";
+                $params[] = $status;
+                $countParams[] = $status;
+                $types .= 's';
+                $countTypes .= 's';
             }
 
             if ($search !== null) {
@@ -1510,6 +1519,7 @@ class QuizSet
                 'per_page' => $perPage,
                 'folder_id' => $folderId,
                 'search' => $search,
+                'status' => $status,
                 'error' => $e->getMessage()
             ]);
             return [
@@ -1527,9 +1537,10 @@ class QuizSet
      * @param int $perPage Items per page
      * @param int|null $folderId Optional folder filter
      * @param string|null $search Optional search term
+     * @param string|null $status Optional status filter
      * @return array Paginated quiz sets without permission records
      */
-    public static function getNotGrantedQuizSetsForUser(int $userId, int $page, int $perPage, ?int $folderId = null, ?string $search = null): array
+    public static function getNotGrantedQuizSetsForUser(int $userId, int $page, int $perPage, ?int $folderId = null, ?string $search = null, ?string $status = null): array
     {
         try {
             $identifier = 'user_' . $userId;
@@ -1569,6 +1580,15 @@ class QuizSet
                 $countParams[] = $folderId;
                 $types .= 'i';
                 $countTypes .= 'i';
+            }
+
+            if ($status !== null) {
+                $query .= " AND qs.status = ?";
+                $countQuery .= " AND qs.status = ?";
+                $params[] = $status;
+                $countParams[] = $status;
+                $types .= 's';
+                $countTypes .= 's';
             }
 
             if ($search !== null) {
@@ -1642,6 +1662,7 @@ class QuizSet
                 'per_page' => $perPage,
                 'folder_id' => $folderId,
                 'search' => $search,
+                'status' => $status,
                 'error' => $e->getMessage()
             ]);
             return [

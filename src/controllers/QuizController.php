@@ -1288,12 +1288,24 @@ class QuizController
 
             $folderId = $this->request->getQueryParameter('folder_id');
             $search = $this->request->getQueryParameter('search');
+            $status = $this->request->getQueryParameter('status');
 
             if ($folderId !== null) {
                 $folderId = (int) $folderId;
             }
 
-            $result = QuizSet::getGrantedQuizSetsForUser($userId, $page, $perPage, $folderId, $search);
+            $validation = Validator::make([
+                'status' => $status,
+            ], [
+                'status' => 'in:published,draft,archived',
+            ]);
+
+            if (!$validation->validate()) {
+                $this->response->badRequest('Invalid status parameter');
+                return;
+            }
+
+            $result = QuizSet::getGrantedQuizSetsForUser($userId, $page, $perPage, $folderId, $search, $status);
             $this->response->success($result, 'Granted quiz sets retrieved successfully');
         } catch (\Exception $e) {
             Logger::error('Error retrieving granted quiz sets for user', [
@@ -1335,12 +1347,24 @@ class QuizController
 
             $folderId = $this->request->getQueryParameter('folder_id');
             $search = $this->request->getQueryParameter('search');
+            $status = $this->request->getQueryParameter('status');
 
             if ($folderId !== null) {
                 $folderId = (int) $folderId;
             }
 
-            $result = QuizSet::getNotGrantedQuizSetsForUser($userId, $page, $perPage, $folderId, $search);
+            $validation = Validator::make([
+                'status' => $status,
+            ], [
+                'status' => 'in:published,draft,archived',
+            ]);
+
+            if (!$validation->validate()) {
+                $this->response->badRequest('Invalid status parameter');
+                return;
+            }
+
+            $result = QuizSet::getNotGrantedQuizSetsForUser($userId, $page, $perPage, $folderId, $search, $status);
             $this->response->success($result, 'Not-granted quiz sets retrieved successfully');
         } catch (\Exception $e) {
             Logger::error('Error retrieving not-granted quiz sets for user', [

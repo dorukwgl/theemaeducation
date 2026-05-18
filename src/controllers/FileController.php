@@ -1272,12 +1272,24 @@ class FileController
 
             $folderId = $this->request->getQueryParameter('folder_id');
             $search = $this->request->getQueryParameter('search');
+            $status = $this->request->getQueryParameter('status');
 
             if ($folderId !== null) {
                 $folderId = (int) $folderId;
             }
 
-            $result = File::getGrantedFilesForUser($userId, $page, $perPage, $folderId, $search);
+            $validation = Validator::make([
+                'status' => $status,
+            ], [
+                'status' => 'in:active,inactive',
+            ]);
+
+            if (!$validation->validate()) {
+                $this->response->validationError($validation->getErrors(), 'Invalid query parameters');
+                return;
+            }
+
+            $result = File::getGrantedFilesForUser($userId, $page, $perPage, $folderId, $search, $status);
             $this->response->success($result, 'Granted files retrieved successfully');
         } catch (\Exception $e) {
             Logger::error('Error retrieving granted files for user', [
@@ -1319,12 +1331,24 @@ class FileController
 
             $folderId = $this->request->getQueryParameter('folder_id');
             $search = $this->request->getQueryParameter('search');
+            $status = $this->request->getQueryParameter('status');
 
             if ($folderId !== null) {
                 $folderId = (int) $folderId;
             }
 
-            $result = File::getNotGrantedFilesForUser($userId, $page, $perPage, $folderId, $search);
+            $validation = Validator::make([
+                'status' => $status,
+            ], [
+                'status' => 'in:active,inactive',
+            ]);
+
+            if (!$validation->validate()) {
+                $this->response->validationError($validation->getErrors(), 'Invalid query parameters');
+                return;
+            }
+
+            $result = File::getNotGrantedFilesForUser($userId, $page, $perPage, $folderId, $search, $status);
             $this->response->success($result, 'Not-granted files retrieved successfully');
         } catch (\Exception $e) {
             Logger::error('Error retrieving not-granted files for user', [

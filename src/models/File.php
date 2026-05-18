@@ -1287,7 +1287,7 @@ class File
      * @param string|null $search Optional search term
      * @return array Paginated files with permission metadata
      */
-    public static function getGrantedFilesForUser(int $userId, int $page, int $perPage, ?int $folderId = null, ?string $search = null): array
+    public static function getGrantedFilesForUser(int $userId, int $page, int $perPage, ?int $folderId = null, ?string $search = null, ?string $status = null): array
     {
         try {
             $identifier = 'user_' . $userId;
@@ -1325,6 +1325,15 @@ class File
                 $countParams[] = $folderId;
                 $types .= 'i';
                 $countTypes .= 'i';
+            }
+
+            if ($status !== null) {
+                $query .= " AND f.status = ?";
+                $countQuery .= " AND f.status = ?";
+                $params[] = $status;
+                $countParams[] = $status;
+                $types .= 's';
+                $countTypes .= 's';
             }
 
             if ($search !== null) {
@@ -1398,6 +1407,7 @@ class File
                 'per_page' => $perPage,
                 'folder_id' => $folderId,
                 'search' => $search,
+                'status' => $status,
                 'error' => $e->getMessage()
             ]);
             return [
@@ -1415,9 +1425,10 @@ class File
      * @param int $perPage Items per page
      * @param int|null $folderId Optional folder filter
      * @param string|null $search Optional search term
+     * @param string|null $status Optional status filter
      * @return array Paginated files without permission records
      */
-    public static function getNotGrantedFilesForUser(int $userId, int $page, int $perPage, ?int $folderId = null, ?string $search = null): array
+    public static function getNotGrantedFilesForUser(int $userId, int $page, int $perPage, ?int $folderId = null, ?string $search = null, ?string $status = null): array
     {
         try {
             $identifier = 'user_' . $userId;
@@ -1454,6 +1465,15 @@ class File
                 $countParams[] = $folderId;
                 $types .= 'i';
                 $countTypes .= 'i';
+            }
+
+            if ($status !== null) {
+                $query .= " AND f.status = ?";
+                $countQuery .= " AND f.status = ?";
+                $params[] = $status;
+                $countParams[] = $status;
+                $types .= 's';
+                $countTypes .= 's';
             }
 
             if ($search !== null) {
@@ -1521,6 +1541,7 @@ class File
                 'per_page' => $perPage,
                 'folder_id' => $folderId,
                 'search' => $search,
+                'status' => $status,
                 'error' => $e->getMessage()
             ]);
             return [
