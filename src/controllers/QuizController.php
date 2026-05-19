@@ -332,19 +332,10 @@ class QuizController
                 $this->response->notFound('Quiz set not found');
                 return;
             }
-            // Non-admins: check published status then access_type
-            if (!User::isAdminById($userId)) {
-                if (!$quizSet['is_published']) {
-                    $this->response->forbidden('Access denied to quiz set');
-                    return;
-                }
-                // Unpublished: allow public/logged_in, fall to checkQuizSetAccess for private
-                if ($quizSet['access_type'] === 'private') {
-                    if (!QuizSet::checkQuizSetAccess($userId, $id)) {
-                        $this->response->forbidden('Access denied to quiz set');
-                        return;
-                    }
-                }
+            // Check access using QuizSet model access control (handles public/logged_in/private)
+            if (!QuizSet::checkQuizSetAccess($userId, $id)) {
+                $this->response->forbidden('Access denied to quiz set');
+                return;
             }
 
             // Get questions
