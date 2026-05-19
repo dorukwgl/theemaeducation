@@ -112,8 +112,21 @@ class Router
                     $controllerInstance->setRequest($request);
                 }
 
+                // Cast numeric string route params to int for controller methods
+                foreach ($params as $key => $value) {
+                    if (is_string($value) && preg_match('/^\d+$/', $value)) {
+                        $params[$key] = (int) $value;
+                    }
+                }
+
                 return call_user_func_array([$controllerInstance, $method], array_values($params));
             } elseif (is_callable($handler)) {
+                // Cast numeric string route params to int for callable handlers
+                foreach ($params as $key => $value) {
+                    if (is_string($value) && preg_match('/^\d+$/', $value)) {
+                        $params[$key] = (int) $value;
+                    }
+                }
                 return call_user_func_array($handler, array_values($params));
             }
             throw new Exception("Invalid route handler");
