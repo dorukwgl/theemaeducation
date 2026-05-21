@@ -116,7 +116,7 @@ class Request
 
     public function getPath(): string
     {
-        return parse_url($this->uri, PHP_URL_PATH);
+        return parse_url($this->uri, PHP_URL_PATH) ?? '/';
     }
 
     public function getQuery(): string

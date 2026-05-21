@@ -147,9 +147,10 @@ class FileController
      * Delete file
      * DELETE /api/files/{id}
      */
-    public function delete(int $id): void
+    public function delete($id): void
     {
         try {
+            $id = (int) $id;
             // Validate CSRF token
             $data = $this->request->allInput();
 
@@ -261,9 +262,12 @@ class FileController
      * GET /api/files/{id}
      * Requires authentication
      */
-    public function show(int $id): void
+    public function show($id): void
     {
         try {
+            // Cast to int for model lookups — non-numeric strings become 0 and return 404
+            $id = (int) $id;
+
             // Get current user
             $currentUser = AuthMiddleware::getCurrentUser();
             $userId = $currentUser['id'] ?? null;
@@ -365,9 +369,11 @@ class FileController
      * GET /api/files/{id}/download
      * Requires authentication
      */
-    public function download(int $id): void
+    public function download($id): void
     {
         try {
+            $id = (int) $id;
+
             // Get current user
             $currentUser = AuthMiddleware::getCurrentUser();
             $userId = $currentUser['id'] ?? null;
@@ -828,9 +834,10 @@ class FileController
      * GET /api/public/folder/{id}/files
      * No authentication required
      */
-    public function publicFolderFiles(int $folderId): void
+    public function publicFolderFiles($folderId): void
     {
         try {
+            $folderId = (int) $folderId;
             $folder = Folder::findById($folderId);
             if (!$folder) {
                 $this->response->error('Folder not found', 404);
@@ -931,9 +938,10 @@ class FileController
      * GET /api/public/files/{id}
      * No authentication required
      */
-    public function publicShow(int $id): void
+    public function publicShow($id): void
     {
         try {
+            $id = (int) $id;
             // Get file details
             $file = File::findById($id);
 
@@ -997,9 +1005,10 @@ class FileController
      * GET /api/public/files/{id}/download
      * No authentication required
      */
-    public function publicDownload(int $id): void
+    public function publicDownload($id): void
     {
         try {
+            $id = (int) $id;
             // Get file details
             $file = File::findById($id);
 
