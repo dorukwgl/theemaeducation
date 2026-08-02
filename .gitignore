@@ -3,3 +3,5 @@ graphify-out/
 .env
 storage/
 uploads/
+logs/
+public/logs/
