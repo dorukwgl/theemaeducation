@@ -39,6 +39,12 @@ class QuizController
      */
     private function mergeQuestionFileUploads(array $data): array
     {
+        // Some clients send the question image as `image`; map it to the API field
+        if (array_key_exists('image', $data) && !array_key_exists('question_file', $data)) {
+            $data['question_file'] = $data['image'];
+            unset($data['image']);
+        }
+
         $fileFields = ['question_file', 'choice_A_file', 'choice_B_file', 'choice_C_file', 'choice_D_file'];
         foreach ($fileFields as $field) {
             if ($this->request->hasFile($field)) {
@@ -477,10 +483,11 @@ class QuizController
             }
 
             $data = $this->request->allInput();
+            $data['quiz_set_id'] = $id;
             $data = $this->mergeQuestionFileUploads($data);
 
             // Validate input data
-            $validation = $this->quizService->validateQuestionData($data);
+            $validation = $this->quizService->validateQuestionData($data, true);
 
             if (!$validation['success']) {
                 $this->response->validationError($validation['errors']);

@@ -160,7 +160,7 @@ class QuizService
     }
 
     
-    public function validateQuestionData(array $data): array
+    public function validateQuestionData(array $data, bool $isUpdate = false): array
     {
         $errors = [];
 
@@ -172,7 +172,9 @@ class QuizService
         $hasQuestionText = isset($data['question']) && !empty(trim($data['question']));
         $hasQuestionFile = isset($data['question_file']) && is_array($data['question_file']) && isset($data['question_file']['tmp_name']);
 
-        if (!$hasQuestionText && !$hasQuestionFile) {
+        // On create a question needs text or a file; on update allow arbitrary
+        // partial updates (e.g. removing the image and adding text)
+        if (!$isUpdate && !$hasQuestionText && !$hasQuestionFile) {
             $errors[] = 'Either question text or a question file is required';
         }
 
@@ -180,10 +182,13 @@ class QuizService
             $errors[] = 'Question text must not exceed 5000 characters';
         }
 
-        if (!isset($data['correct_answer'])) {
+        // correct_answer is required on create, optional on update (validated if present)
+        if (isset($data['correct_answer'])) {
+            if (!in_array(strtoupper($data['correct_answer']), ['A', 'B', 'C', 'D'])) {
+                $errors[] = 'Correct answer must be A, B, C, or D';
+            }
+        } elseif (!$isUpdate) {
             $errors[] = 'Correct answer is required';
-        } elseif (!in_array(strtoupper($data['correct_answer']), ['A', 'B', 'C', 'D'])) {
-            $errors[] = 'Correct answer must be A, B, C, or D';
         }
 
         // Validate optional text
@@ -836,7 +841,8 @@ class QuizService
 
         $choiceFileFields = ['question_file', 'choice_A_file', 'choice_B_file', 'choice_C_file', 'choice_D_file'];
         foreach ($choiceFileFields as $field) {
-            if (isset($data[$field]) && is_array($data[$field]) && isset($data[$field]['tmp_name'])) {
+            // Preserve null/empty values so updates can clear existing files
+            if (array_key_exists($field, $data)) {
                 $sanitized[$field] = $data[$field];
             }
         }

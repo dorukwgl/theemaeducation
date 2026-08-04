@@ -450,6 +450,24 @@ class Question
                 $params[] = $questionUpload['file_mime'];
             }
 
+            // Handle question file removal (null/empty deletes the old image)
+            if (array_key_exists('question_file', $data)
+                && ($data['question_file'] === null || $data['question_file'] === '')
+            ) {
+                $oldPath = $question['question_file'] ?? null;
+                if ($oldPath) {
+                    $prefix = strpos($oldPath, 'uploads/') === 0 ? '' : 'uploads/';
+                    $fullPath = ROOT_PATH . '/' . $prefix . $oldPath;
+                    if (file_exists($fullPath)) {
+                        unlink($fullPath);
+                    }
+                }
+
+                $updates[] = 'question_file = NULL';
+                $updates[] = 'question_file_type = NULL';
+                $updates[] = 'question_file_mime = NULL';
+            }
+
             // Handle choice file replacements (A, B, C, D)
             $choiceFields = ['A', 'B', 'C', 'D'];
             foreach ($choiceFields as $choice) {
@@ -480,6 +498,26 @@ class Question
                     $params[] = $choiceUpload['file_path'];
                     $params[] = $choiceUpload['file_type'];
                     $params[] = $choiceUpload['file_mime'];
+                }
+
+                // Handle choice file removal (null/empty deletes the old file)
+                if (array_key_exists($fileKey, $data)
+                    && ($data[$fileKey] === null || $data[$fileKey] === '')
+                ) {
+                    $oldPath = $question[$fileKey] ?? null;
+                    if ($oldPath) {
+                        $prefix = strpos($oldPath, 'uploads/') === 0 ? '' : 'uploads/';
+                        $fullPath = ROOT_PATH . '/' . $prefix . $oldPath;
+                        if (file_exists($fullPath)) {
+                            unlink($fullPath);
+                        }
+                    }
+
+                    $typeKey = 'choice_' . $choice . '_file_type';
+                    $mimeKey = 'choice_' . $choice . '_file_mime';
+                    $updates[] = $fileKey . ' = NULL';
+                    $updates[] = $typeKey . ' = NULL';
+                    $updates[] = $mimeKey . ' = NULL';
                 }
             }
 
