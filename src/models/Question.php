@@ -384,6 +384,16 @@ class Question
                 $params[] = $data['optional_text'];
             }
 
+            // Handle choice text updates
+            $choiceTextFields = ['choice_A_text', 'choice_B_text', 'choice_C_text', 'choice_D_text'];
+            foreach ($choiceTextFields as $field) {
+                if (isset($data[$field])) {
+                    $updates[] = $field . ' = ?';
+                    $types .= 's';
+                    $params[] = $data[$field];
+                }
+            }
+
             // Handle correct_answer update
             if (isset($data['correct_answer'])) {
                 $correctAnswer = strtoupper($data['correct_answer']);
