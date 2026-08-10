@@ -1296,8 +1296,8 @@ class QuizSet
                 // Remove the STATUS_PUBLISHED from params
                 array_splice($params, 1, 1);
                 array_splice($countParams, 1, 1);
-                $types = 'ssss'; // Remove one 's'
-                $countTypes = 'ssss';
+                $types = substr_replace($types, '', 1, 1); // Remove STATUS_PUBLISHED type (index 1), keeping folder/accessType additions
+                $countTypes = substr_replace($countTypes, '', 1, 1);
 
                 $query .= " AND qs.status = ?";
                 $countQuery .= " AND qs.status = ?";
